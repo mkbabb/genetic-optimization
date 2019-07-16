@@ -1,7 +1,0 @@
-[
-{
-  "directory": "/Users/mkbabb/Documents/PycharmProjects/erate/build",
-  "command": "/usr/local/Cellar/llvm/7.0.1/bin/clang++   -I/usr/local/Cellar/llvm/7.0.1/include/c++/v1  -g -isysroot /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.14.sdk   -fcoroutines-ts -stdlib=libc++ -std=c++17 -g  -stdlib=libc++ -o CMakeFiles/erate.dir/include/main.cpp.o -c /Users/mkbabb/Documents/PycharmProjects/erate/include/main.cpp",
-  "file": "/Users/mkbabb/Documents/PycharmProjects/erate/include/main.cpp"
-}
-]
