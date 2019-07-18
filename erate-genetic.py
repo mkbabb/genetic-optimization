@@ -7,6 +7,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from scipy.signal import fftconvolve
+from matplotlib import pyplot as plt
 
 SEED = 0xDEADBEEF
 
@@ -175,6 +176,9 @@ def optimize_buckets(data: pd.DataFrame,
                     print(
                         f"lea: {data.loc[i, 'lea-number']}, bucket: {critter.genes[i][1]}")
                     critter.genes[i][0] = 1
+        print("---")
+        # for j in range(population_size):
+        #     print(critters[j].fitness / extremal_fitness)
 
         critters = mate_critters(data,
                                  critters,
@@ -183,13 +187,83 @@ def optimize_buckets(data: pd.DataFrame,
                                  parent_count)
 
 
-data = pd.read_csv("erate-data.csv",
-                   names=["lea-number", "discount", "cost"])[:30]
+def shuffle_buckets(arr: np.ndarray,
+                    intervals: List[int]) -> List[np.ndarray]:
+    np.random.shuffle(arr)
+    buckets = []
+    start = 0
+    for i in intervals:
+        buckets.append(np.sort(arr[start:i + start].astype(int)))
+        start += i
+    return buckets
+
+
+def gradient_descent(x, y, gamma, iterations):
+    N = len(x)
+    a_n = np.zeros((x.shape[1], 1))
+    for i in range(0, iterations):
+        gradient = x.T @ (x @ a_n - y) / (2 * N)
+        a_n = a_n - gamma * gradient
+    error = 1 - np.sum((x @ a_n - y) ** 2) / np.sum((np.average(y) - y)**2)
+    return a_n, error
+
+
+def linest(y, x=None, plot=False, c="r-"):
+    N = len(y)
+    if (x is None):
+        x = np.arange(N).reshape((-1, 1)) + 1
+    pts, error = gradient_descent(
+        np.hstack((np.ones(x.shape), x)),
+        y,
+        0.0001,
+        10000)
+    if (plot):
+        plt.plot(x, y, "x")
+        plt.plot(x, x * pts[1] + pts[0], c)
+    return pts, error
+
+
+def test_rand(N, b, plot=False):
+    arr = np.arange(N)
+    intervals = [N // b for i in range(b)]
+
+    t: Dict[int, List[int]] = {i: [] for i in range(b)}
+
+    for i in range(N):
+        j = random.randrange(0, b)
+        t[j].append(i)
+
+    e1 = 0
+    for i in range(b):
+        y = np.asarray(t[i]).reshape((-1, 1))
+        pts, error = linest(y, None, plot, "-b")
+        e1 += error
+    e1 /= b
+
+    e2 = 0
+    buckets = shuffle_buckets(arr, intervals)
+    for i in range(b):
+        y = np.asarray(buckets[i]).reshape((-1, 1))
+        pts, error = linest(y, None, plot)
+        e2 += error
+    e2 /= b
+
+    print(e1, e2)
+
+    if (plot):
+        plt.show()
+
+# test_rand(1000, 5, True)
+
+
+data = pd.read_csv("erate-data-2015.csv",
+                   header=0)
+print(data)
 
 optimize_buckets(data,
-                 bucket_count=3,
-                 max_bucket=2,
-                 population_size=10,
+                 bucket_count=2,
+                 max_bucket=100,
+                 population_size=100,
                  mutation_rate=0.3,
                  parent_count=2,
                  iterations=1000)

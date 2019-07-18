@@ -54,15 +54,15 @@ Random<Dtype, CastType>::random(DriverType driver)
 
 template<typename Dtype, typename CastType>
 Dtype
-Random<Dtype, CastType>::db_modulo_twice(CastType range)
+Random<Dtype, CastType>::db_modulo_twice(CastType bound)
 {
-  CastType t = (-range) % range;
+  CastType t = (-bound) % bound;
   CastType r;
 
-  for (;;) {
+  while (true) {
     r = random();
     if (r >= t) {
-      return r % range;
+      return r % bound;
     };
   }
 }

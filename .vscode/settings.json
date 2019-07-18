@@ -60,7 +60,15 @@
         "tuple": "cpp",
         "type_traits": "cpp",
         "utility": "cpp",
-        "vector": "cpp"
+        "vector": "cpp",
+        "__node_handle": "cpp",
+        "__tree": "cpp",
+        "array": "cpp",
+        "condition_variable": "cpp",
+        "map": "cpp",
+        "optional": "cpp",
+        "thread": "cpp",
+        "sstream": "cpp"
     },
     "C_Cpp.default.configurationProvider": "vector-of-bool.cmake-tools",
     "C_Cpp.intelliSenseEngineFallback": "Enabled",
