@@ -19,9 +19,13 @@
 
 uint64_t STATE = 0xDEADBEEF;
 uint64_t STATE2 = 0xDEADBEEFED;
+uint64_t STATE3 = 0xFEEDBEEF;
+
+constexpr int MAX_2015 = 11'810'384;
+constexpr int MAX_2019 = 15'034'520;
 
 uint32_t
-rand2m(uint8_t m, uint64_t* state)
+rand2m(uint8_t m, uint64_t* state = &::STATE3)
 {
   return lcg_xor_rot(state) >> (31 - m);
 };
@@ -39,9 +43,9 @@ bounded_rand(F& rng, uint32_t range)
 }
 
 uint32_t
-randrange(uint32_t a, uint32_t b)
+randrange(uint32_t a, uint32_t b, uint64_t* state = &::STATE2)
 {
-  auto rng = [&]() { return lcg_xor_rot(&::STATE2); };
+  auto rng = [&]() { return lcg_xor_rot(state); };
   uint32_t range = b - a;
   return bounded_rand(rng, range) + a;
 }
@@ -57,13 +61,27 @@ class Critter
 public:
   std::vector<std::tuple<int, int>> genes;
   double fitness;
+  bool skip;
 
   Critter(int N)
     : fitness(0)
+    , skip(false)
   {
-    for (int i = 0; i < N; i++) {
-      genes.push_back({ 0, 0 });
+    genes.resize(N);
+    std::fill(begin(genes), end(genes), std::forward_as_tuple(0, 0));
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, Critter const& data)
+  {
+    fmt::memory_buffer c;
+    fmt::format_to(
+      c, "{{\nfitness: {0},\nskip: {1},\ngenes:\n\t[", data.fitness, data.skip);
+    for (auto& [g1, g2] : data.genes) {
+      fmt::format_to(c, "\n\t\t[{0}, {1}]", g1, g2);
     }
+    fmt::format_to(c, "\n\t]\n}}");
+    os << c.data();
+    return os;
   }
 };
 
@@ -79,12 +97,13 @@ calc_erate_stats(std::vector<erate_t>& data,
   int blog = ilog2(bucket_count) - 1;
 
   for (int i = 0; i < N; i++) {
-    int j = std::get<0>(critter.genes[i]) ? std::get<1>(critter.genes[i])
-                                          : randrange(0, bucket_count);
+    int j = std::get<0>(critter.genes[i])
+              ? std::get<1>(critter.genes[i])
+              : blog != -1 ? rand2m(blog) : randrange(0, bucket_count);
 
     if (full_buckets[j]) {
       while (full_buckets[j]) {
-        j = randrange(0, bucket_count);
+        j = blog != -1 ? rand2m(blog) : randrange(0, bucket_count);
       }
     }
 
@@ -104,26 +123,75 @@ calc_erate_stats(std::vector<erate_t>& data,
     auto& b = buckets[i];
     if (b["count"] > 0) {
       b["average_discount"] =
-        double_round(b["total_discount"] / (100 * b["count"]), 2);
-      b["discount_cost"] =
-        double_round(b["average_discount"] * b["total_cost"]);
-    }
-    fitness += b["discount_cost"];
-    full_buckets[i] = 0;
+        double_round((b["total_discount"] / (b["count"] * 100)), 2);
+      b["discount_cost"] = b["average_discount"] * b["total_cost"];
 
-    for (auto& [key, value] : b) {
-      b[key] = 0;
+      fitness += b["discount_cost"];
+      full_buckets[i] = 0;
+
+      for (auto& [key, value] : b) {
+        b[key] = 0;
+      }
     }
+    critter.fitness = fitness;
   }
-  critter.fitness = fitness;
 }
 
 template<typename Func>
 void
-op_critter(Critter c1, Critter c2, Func func)
+op_critter(Critter& c1, Critter& c2, Func func)
 {
   for (int i = 0; i < c1.genes.size(); i++) {
     func(c1, c2, i);
+  }
+}
+
+auto
+parent_distb(int N) -> std::vector<int>
+{
+  std::vector<int> t(N);
+
+  if (N == 1) {
+    t[0] = 1;
+  } else {
+    int first = 80;
+    int second = 20;
+    int third = 10;
+
+    t[0] = first - 10 * (N - 2);
+    t[1] = second;
+    for (int i = 0; i < N - 3; i++) {
+      t[i] = third;
+    }
+  }
+  return t;
+}
+
+void
+mate_t(Critter& child,
+       std::vector<Critter>& parents,
+       std::vector<int>& pdistb,
+       int N)
+{
+  std::sort(begin(parents), end(parents), [](auto c1, auto c2) {
+    return c1.fitness > c2.fitness;
+  });
+  int parent = 0;
+
+  for (int i = 0; i < N; i++) {
+    int r = randrange(0, 100);
+    int start = 0;
+
+    for (int j = 0; j < parents.size(); j++) {
+      if (start < r && r < (start + pdistb[j])) {
+        parent = j;
+        break;
+      } else {
+        start += pdistb[j];
+      }
+    }
+    std::get<0>(child.genes[i]) = std::get<0>(parents[parent].genes[i]);
+    std::get<1>(child.genes[i]) = std::get<1>(parents[parent].genes[i]);
   }
 }
 
@@ -133,52 +201,39 @@ mate_critters(std::vector<erate_t>& data,
               int mut_count,
               int parent_count,
               int N,
+              int top_pool,
+              std::vector<int>& pdistb,
               std::vector<Critter>& critters)
 {
   int M = critters.size();
-
-  double ratio = 0;
-  for (auto& critter : critters) {
-    if (critter.fitness > 0) {
-      critter.fitness = (critter.fitness / max_fitness - 0.9) * 10;
-      ratio += critter.fitness > 0 ? 1 / critter.fitness : 0;
-    }
-  }
 
   std::sort(begin(critters), end(critters), [](auto c1, auto c2) {
     return c1.fitness > c2.fitness;
   });
 
-  //   int L = M * ratio;
-  //   std::map<int, int> weights;
-  //   int k = 0;
-  //   for (int i = 0; i < M; i++) {
-  //     int count = L * critters[i].fitness;
-  //     for (int j = 0; j < count; j++) {
-  //       weights[k] = i;
-  //       k += 1;
-  //     }
-  //   }
+  std::vector<Critter> children(begin(critters), begin(critters) + top_pool);
+  std::vector<Critter> parents(begin(critters), begin(critters) + parent_count);
+  for (auto& child : children) {
+    child.skip = true;
+  }
 
-  std::vector<Critter> children(begin(critters),
-                                begin(critters) + parent_count);
-
-  for (int i = 0; i < M - parent_count; i++) {
+  for (int i = 0; i < M - top_pool; i++) {
     Critter child(N);
+    child.skip = false;
+
     for (int j = 0; j < parent_count; j++) {
       int r = randrange(0, M - 1);
-      auto parent = critters[r];
-      if (j == 0) {
-        std::copy(begin(parent.genes), end(parent.genes), begin(child.genes));
-      } else {
-        op_critter(child, parent, [](auto& c1, auto& c2, int i) {
-          std::get<0>(c1.genes[i]) &= std::get<0>(c2.genes[i]);
-        });
-      }
+      parents[j] = critters[r];
     }
+
+    // std::copy(
+    //   begin(parents[0].genes), end(parents[0].genes), begin(child.genes));
+
+    mate_t(child, parents, pdistb, N);
+
     for (int j = 0; j < mut_count; j++) {
       int k = randrange(0, N);
-      std::get<0>(child.genes[k]) = randrange(0, 1);
+      std::get<0>(child.genes[k]) ^= 1;
     }
     children.push_back(child);
   }
@@ -188,18 +243,22 @@ mate_critters(std::vector<erate_t>& data,
 auto
 optimize_buckets(std::vector<erate_t> data,
                  int bucket_count,
-                 int max_bucket,
                  int pop_count = 10,
                  int mut_rate = 1,
                  int parent_count = 2,
-                 int iterations = 1000) -> void
+                 int iterations = 1000,
+                 int max_bucket = 0,
+                 bool save_critter = false) -> void
 {
+  std::ofstream myfile;
 
   int N = data.size();
+  int top_pool = pop_count / 10;
   max_bucket = std::max(max_bucket, N / bucket_count);
   int mut_count = static_cast<float>(N * mut_rate) / 100;
   double max_fitness = 0;
 
+  std::vector<int> pdistb = parent_distb(parent_count);
   std::map<int, std::map<std::string, double>> buckets;
   std::vector<int> full_buckets(bucket_count, 0);
 
@@ -210,50 +269,84 @@ optimize_buckets(std::vector<erate_t> data,
                                                 { "discount_cost", 0 },
                                                 { "count", 0 } };
   }
-
   std::vector<Critter> critters;
   for (int i = 0; i < pop_count; i++) {
     critters.emplace_back(N);
   }
+  int l = 0;
+  int t_mut_count = mut_count;
 
   for (int i = 0; i < iterations; i++) {
     for (auto& critter : critters) {
-      calc_erate_stats(
-        data, bucket_count, max_bucket, N, critter, buckets, full_buckets);
+      if (!critter.skip) {
+        calc_erate_stats(
+          data, bucket_count, max_bucket, N, critter, buckets, full_buckets);
 
-      if (critter.fitness > max_fitness) {
-        std::ofstream myfile;
-        myfile.open("./erate-max-2015.csv",
-                    std::ofstream::out | std::ofstream::trunc);
+        if (critter.fitness > max_fitness) {
+          myfile.open("./erate-max-2015.csv", std::ios::trunc);
 
-        std::cout << critter.fitness << " " << i << std::endl;
-        max_fitness = critter.fitness;
+          std::string header =
+            fmt::format("--- iteration: {0}, discount-total: {1:.2f} ---\n"
+                        "--- max-delta: {2:.2f}, p-max-delta: {3:.2f}, "
+                        "iteration-delta: {4} ---",
+                        i,
+                        critter.fitness,
+                        critter.fitness - MAX_2019,
+                        critter.fitness - max_fitness,
+                        i - l);
 
-        myfile << "lea-number,discount,cost,bucket\n";
-        fmt::memory_buffer row;
+          max_fitness = critter.fitness;
+          l = i;
 
-        for (int k = 0; k < N; k++) {
-          fmt::format_to(row,
-                         "{0},{1},{2},{3}\n",
-                         data[k].lea_number,
-                         data[k].discount,
-                         data[k].cost,
-                         std::get<1>(critter.genes[k]));
+          myfile << header + "\n";
+          std::cout << header << std::endl;
+
+          myfile << "lea-number,discount,cost,bucket\n";
+          fmt::memory_buffer row;
+          for (int k = 0; k < N; k++) {
+            fmt::format_to(row,
+                           "{0},{1},{2},{3}\n",
+                           data[k].lea_number,
+                           data[k].discount,
+                           data[k].cost,
+                           std::get<1>(critter.genes[k]));
+            std::get<0>(critter.genes[k]) = 1;
+          }
           myfile << row.data();
-          std::get<0>(critter.genes[k]) = 1;
+          if (save_critter) {
+            myfile << "\n--- critters of iteration " << i << " ---\n";
+            myfile << "{";
+            for (int k = 0; k < pop_count; k++) {
+              myfile << "\ncritter_" << k << ": " << critters[k] << ",";
+            }
+            myfile << "}";
+          }
+          myfile.close();
         }
-      };
+      } else {
+        critter.skip = true;
+      }
     }
-    mate_critters(data, max_fitness, mut_count, parent_count, N, critters);
+    // if ((i - l) > 1000) {
+    //   l = i;
+    //   t_mut_count = static_cast<float>(N * 2 * mut_count) / 100;
+    // }
+    mate_critters(data,
+                  max_fitness,
+                  t_mut_count,
+                  parent_count,
+                  N,
+                  top_pool,
+                  pdistb,
+                  critters);
+    t_mut_count = mut_count;
   }
 }
-
-const int MAX_2015 = 11810384;
 
 int
 main()
 {
-  io::CSVReader<3> in("./erate-data-2015.csv");
+  io::CSVReader<3> in("./erate-data-2019.csv");
   in.read_header(io::ignore_extra_column, "lea-number", "discount", "cost");
   std::vector<erate_t> erate_data;
 
@@ -261,14 +354,26 @@ main()
   int discount, cost;
 
   int i = 0;
-  int N = 221;
+  int N = 281;
 
   while (in.read_row(lea_number, discount, cost) && i++ < N) {
     erate_data.push_back(erate_t{ lea_number, discount, cost });
   }
-  std::cout << erate_data.size() << std::endl;
 
-  optimize_buckets(erate_data, 3, 100, 100, 1, 2, 1'000'000);
+  int bucket_count = 4;
+  int pop_count = 100;
+  int max_bucket = 150;
+  int mut_rate = 1;
+  int parent_count = 9;
+  int iterations = 10'000'000;
+
+  optimize_buckets(erate_data,
+                   bucket_count,
+                   pop_count,
+                   mut_rate,
+                   parent_count,
+                   iterations,
+                   max_bucket);
 
   //   int n = 32;
   //   int lgn = log2(n);

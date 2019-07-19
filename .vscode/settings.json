@@ -68,9 +68,11 @@
         "map": "cpp",
         "optional": "cpp",
         "thread": "cpp",
-        "sstream": "cpp"
+        "sstream": "cpp",
+        "set": "cpp"
     },
     "C_Cpp.default.configurationProvider": "vector-of-bool.cmake-tools",
     "C_Cpp.intelliSenseEngineFallback": "Enabled",
-    "python.pythonPath": "/Users/mkbabb/anaconda3/bin/python"
+    "python.pythonPath": "/Users/mkbabb/anaconda3/bin/python",
+    "cmake.configureOnOpen": false
 }
