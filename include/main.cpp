@@ -247,6 +247,7 @@ optimize_buckets(std::vector<erate_t> data,
                  int mut_rate = 1,
                  int parent_count = 2,
                  int iterations = 1000,
+                 int mut_threshold = 1000,
                  int max_bucket = 0,
                  bool save_critter = false) -> void
 {
@@ -273,7 +274,9 @@ optimize_buckets(std::vector<erate_t> data,
   for (int i = 0; i < pop_count; i++) {
     critters.emplace_back(N);
   }
+
   int l = 0;
+  int mut_gap = 0;
   int t_mut_count = mut_count;
 
   for (int i = 0; i < iterations; i++) {
@@ -293,10 +296,11 @@ optimize_buckets(std::vector<erate_t> data,
                         critter.fitness,
                         critter.fitness - MAX_2019,
                         critter.fitness - max_fitness,
-                        i - l);
+                        i - mut_gap);
 
           max_fitness = critter.fitness;
           l = i;
+          mut_gap = i;
 
           myfile << header + "\n";
           std::cout << header << std::endl;
@@ -327,10 +331,10 @@ optimize_buckets(std::vector<erate_t> data,
         critter.skip = true;
       }
     }
-    // if ((i - l) > 1000) {
-    //   l = i;
-    //   t_mut_count = static_cast<float>(N * 2 * mut_count) / 100;
-    // }
+    if ((i - l) > mut_threshold) {
+      l = i;
+      t_mut_count = static_cast<float>(N * bucket_count * mut_count) / 100;
+    }
     mate_critters(data,
                   max_fitness,
                   t_mut_count,
@@ -366,6 +370,7 @@ main()
   int mut_rate = 1;
   int parent_count = 9;
   int iterations = 10'000'000;
+  int mut_threshold = 1'000;
 
   optimize_buckets(erate_data,
                    bucket_count,
@@ -373,6 +378,7 @@ main()
                    mut_rate,
                    parent_count,
                    iterations,
+                   mut_threshold,
                    max_bucket);
 
   //   int n = 32;
