@@ -168,19 +168,40 @@ calc_erate_stats(std::vector<erate_t>& data,
   }
 }
 
+// auto
+// parent_distb(int N) -> std::vector<int>
+// {
+
+//   int slice = ceil(100.0 / N);
+//   if (N * slice > 100) {
+//     std::vector<int> t(N, slice);
+//     t[N - 1] = (100 - (N * (slice - 1)));
+//     return t;
+//   } else {
+//     std::vector<int> t(N, slice);
+//     return t;
+//   }
+// }
+
 auto
 parent_distb(int N) -> std::vector<int>
 {
+  std::vector<int> t(N);
 
-  int slice = ceil(100.0 / N);
-  if (N * slice > 100) {
-    std::vector<int> t(N, slice);
-    t[N - 1] = (100 - (N * (slice - 1)));
-    return t;
+  if (N == 1) {
+    t[0] = 1;
   } else {
-    std::vector<int> t(N, slice);
-    return t;
+    int first = 80;
+    int second = 20;
+    int third = 10;
+
+    t[0] = first - 10 * (N - 2);
+    t[1] = second;
+    for (int i = 0; i < N - 3; i++) {
+      t[i] = third;
+    }
   }
+  return t;
 }
 
 void
@@ -259,13 +280,13 @@ make_genes(std::vector<erate_t>& data, int bucket_count)
   int blog = ilog2(bucket_count) - 1;
 
   for (auto [n, d] : tupletools::enumerate(data)) {
-    std::tuple<int, int> tup;
-    if (d.do_mutate) {
-      tup = std::make_tuple(d.do_mutate, d.bucket);
-    } else {
-      tup = std::make_tuple(
-        0, blog != -1 ? rand2m(blog) : randrange(0, bucket_count));
-    }
+    std::tuple<int, int> tup = std::make_tuple(0, 0);
+    // if (d.do_mutate) {
+    //   tup = std::make_tuple(d.do_mutate, d.bucket);
+    // } else {
+    //   tup = std::make_tuple(
+    //     0, blog != -1 ? rand2m(blog) : randrange(0, bucket_count));
+    // }
     genes.push_back(tup);
   }
   return genes;
@@ -372,7 +393,7 @@ main(int argc, char** argv)
     "bucket_count", "Bucket count", cxxopts::value<int>()->default_value("4"))(
     "max_bucket",
     "Max bucket count",
-    cxxopts::value<int>()->default_value("100"))(
+    cxxopts::value<int>()->default_value("150"))(
     "pop_count",
     "Population count",
     cxxopts::value<int>()->default_value("100"))(
