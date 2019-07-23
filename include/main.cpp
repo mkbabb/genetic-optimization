@@ -3,8 +3,7 @@
 #include "csv.hpp"
 #include "cxxopts.hpp"
 #include "fmt/format.h"
-#include "random_t/lcg.cpp"
-#include "random_t/xor_shift.cpp"
+#include "rng/rng.hpp"
 #include "tupletools.hpp"
 #include "utils.cpp"
 #include <algorithm>
@@ -14,44 +13,14 @@
 #include <iostream>
 #include <map>
 #include <optional>
+#include <random>
 #include <sstream>
 #include <tuple>
 #include <type_traits>
 #include <vector>
 
-uint64_t STATE1 = 0xDEADBEEF;
-uint64_t STATE2 = 0xDEADBEEFED;
-uint64_t STATE3 = 0xFEEDBEEF;
-uint64_t STATE4 = 0xABBADEAF;
-
 constexpr int MAX_2015 = 11'810'384;
 constexpr int MAX_2019 = 15'034'520;
-
-uint32_t
-rand2m(uint8_t m, uint64_t* state = &::STATE3)
-{
-  return lcg_xor_rot(state) >> (31 - m);
-};
-
-template<typename F>
-uint32_t
-bounded_rand(F& rng, uint32_t range)
-{
-  uint32_t t = (-range) % range;
-  while (true) {
-    uint32_t r = rng();
-    if (r >= t)
-      return r % range;
-  }
-}
-
-uint32_t
-randrange(uint32_t a, uint32_t b, uint64_t* state = &::STATE2)
-{
-  auto rng = [&]() { return lcg_xor_rot(state); };
-  uint32_t range = b - a;
-  return bounded_rand(rng, range) + a;
-}
 
 struct erate_t
 {
@@ -128,13 +97,14 @@ calc_erate_stats(std::vector<erate_t>& data,
   int blog = ilog2(bucket_count) - 1;
 
   for (int i = 0; i < N; i++) {
-    int j = std::get<0>(critter.genes()[i])
-              ? std::get<1>(critter.genes()[i])
-              : blog != -1 ? rand2m(blog) : randrange(0, bucket_count);
+    int j =
+      std::get<0>(critter.genes()[i])
+        ? std::get<1>(critter.genes()[i])
+        : blog != -1 ? rand2m(blog) : randrange(0, bucket_count, lcg_xor_rot);
 
     if (full_buckets[j]) {
       while (full_buckets[j]) {
-        j = blog != -1 ? rand2m(blog) : randrange(0, bucket_count);
+        j = blog != -1 ? rand2m(blog) : randrange(0, bucket_count, lcg_xor_rot);
       }
     }
 
@@ -146,6 +116,7 @@ calc_erate_stats(std::vector<erate_t>& data,
     if (b["count"] > max_bucket) {
       full_buckets[j] = 1;
     }
+    std::get<0>(critter.genes()[i]) = std::get<0>(critter.genes()[i]) ? 1 : 0;
     std::get<1>(critter.genes()[i]) = j;
   }
 
@@ -168,41 +139,41 @@ calc_erate_stats(std::vector<erate_t>& data,
   }
 }
 
-// auto
-// parent_distb(int N) -> std::vector<int>
-// {
-
-//   int slice = ceil(100.0 / N);
-//   if (N * slice > 100) {
-//     std::vector<int> t(N, slice);
-//     t[N - 1] = (100 - (N * (slice - 1)));
-//     return t;
-//   } else {
-//     std::vector<int> t(N, slice);
-//     return t;
-//   }
-// }
-
 auto
 parent_distb(int N) -> std::vector<int>
 {
-  std::vector<int> t(N);
 
-  if (N == 1) {
-    t[0] = 1;
+  int slice = ceil(100.0 / N);
+  if (N * slice > 100) {
+    std::vector<int> t(N, slice);
+    t[N - 1] = (100 - (N * (slice - 1)));
+    return t;
   } else {
-    int first = 80;
-    int second = 20;
-    int third = 10;
-
-    t[0] = first - 10 * (N - 2);
-    t[1] = second;
-    for (int i = 0; i < N - 3; i++) {
-      t[i] = third;
-    }
+    std::vector<int> t(N, slice);
+    return t;
   }
-  return t;
 }
+
+// auto
+// parent_distb(int N) -> std::vector<int>
+// {
+//   std::vector<int> t(N);
+
+//   if (N == 1) {
+//     t[0] = 1;
+//   } else {
+//     int first = 80;
+//     int second = 20;
+//     int third = 10;
+
+//     t[0] = first - 10 * (N - 2);
+//     t[1] = second;
+//     for (int i = 0; i < N - 3; i++) {
+//       t[i] = third;
+//     }
+//   }
+//   return t;
+// }
 
 void
 mate_t(Critter& child,
@@ -216,10 +187,10 @@ mate_t(Critter& child,
   int parent = 0;
 
   for (int i = 0; i < N; i++) {
-    int r = randrange(0, 100);
+    int r = randrange(0, 100, lcg_xor_rot);
     int start = 0;
 
-    for (int j = 0; j < parents.size(); j++) {
+    for (int j = 0; j < pdistb.size(); j++) {
       if (start < r && r < (start + pdistb[j])) {
         parent = j;
         break;
@@ -236,7 +207,7 @@ void
 mate_critters(std::vector<erate_t>& data,
               int max_fitness,
               int mut_count,
-              int parent_count,
+              int mating_pool_count,
               int N,
               int top_pool,
               std::vector<int>& pdistb,
@@ -249,21 +220,25 @@ mate_critters(std::vector<erate_t>& data,
   });
 
   std::vector<Critter> children(begin(critters), begin(critters) + top_pool);
-  std::vector<Critter> parents(begin(critters), begin(critters) + parent_count);
+  std::vector<Critter> parents(begin(critters),
+                               begin(critters) + mating_pool_count);
+  for (auto& child : children) {
+    child.skip(true);
+  }
 
   for (int i = 0; i < M - top_pool; i++) {
     Critter child(N);
 
-    for (int j = 0; j < parent_count; j++) {
-      int r = randrange(0, M - 1);
+    for (int j = 0; j < mating_pool_count; j++) {
+      int r = randrange(0, M - 1, lcg_xor_rot);
       parents[j] = critters[r];
     }
 
     mate_t(child, parents, pdistb, N);
 
     for (int j = 0; j < mut_count; j++) {
-      int k = randrange(0, N);
-      std::get<0>(child.genes()[k]) = randrange(0, 1, &::STATE4);
+      int k = randrange(0, N, lcg_xor_rot);
+      std::get<0>(child.genes()[k]) = randrange(0, 1, lcg_xor_rot);
     }
     children.push_back(child);
   }
@@ -279,14 +254,13 @@ make_genes(std::vector<erate_t>& data, int bucket_count)
 
   int blog = ilog2(bucket_count) - 1;
 
-  for (auto [n, d] : tupletools::enumerate(data)) {
-    std::tuple<int, int> tup = std::make_tuple(0, 0);
-    // if (d.do_mutate) {
-    //   tup = std::make_tuple(d.do_mutate, d.bucket);
-    // } else {
-    //   tup = std::make_tuple(
-    //     0, blog != -1 ? rand2m(blog) : randrange(0, bucket_count));
-    // }
+  for (auto d : data) {
+    std::tuple<int, int> tup;
+    if (d.do_mutate) {
+      tup = std::make_tuple(d.do_mutate, d.bucket);
+    } else {
+      tup = std::make_tuple(0, 0);
+    }
     genes.push_back(tup);
   }
   return genes;
@@ -299,6 +273,7 @@ optimize_buckets(std::vector<erate_t> data,
                  int pop_count,
                  int mut_rate,
                  int parent_count,
+                 int mating_pool_count,
                  int iterations,
                  int mut_threshold_low,
                  int mut_threshold_high,
@@ -309,6 +284,9 @@ optimize_buckets(std::vector<erate_t> data,
   int N = data.size();
   int top_pool = pop_count / 10;
   max_bucket = std::max(max_bucket, N / bucket_count);
+  mating_pool_count = std::min(mating_pool_count, N - 1);
+  mut_threshold_high =
+    static_cast<float>(mut_threshold_high) / mut_threshold_low;
   int mut_count = static_cast<float>(N * mut_rate) / 100;
   double max_fitness = 0;
 
@@ -327,54 +305,67 @@ optimize_buckets(std::vector<erate_t> data,
   std::vector<std::tuple<int, int>> genes = make_genes(data, bucket_count);
   std::vector<Critter> critters(pop_count, { N, genes });
 
-  int l = 0;
+  int mut_low_counter = 0;
+  int mut_high_counter = 0;
   int mut_gap = 0;
   int t_mut_count = mut_count;
+
   for (int i = 0; i < iterations; i++) {
     for (auto& critter : critters) {
-      calc_erate_stats(
-        data, bucket_count, max_bucket, N, critter, buckets, full_buckets);
+      if (!critter.skip()) {
+        calc_erate_stats(
+          data, bucket_count, max_bucket, N, critter, buckets, full_buckets);
 
-      if (critter.fitness() > max_fitness) {
-        ofs.open(out_file, std::ios::trunc);
+        if (critter.fitness() > max_fitness) {
+          ofs.open(out_file, std::ios::trunc);
 
-        std::string header =
-          fmt::format("--- iteration: {0}, discount-total: {1:.2f} ---\n"
-                      "--- max-delta: {2:.2f}, prev-max-delta: {3:.2f}, "
-                      "iteration-delta: {4} ---",
-                      i,
-                      critter.fitness(),
-                      critter.fitness() - MAX_2019,
-                      critter.fitness() - max_fitness,
-                      i - mut_gap);
+          std::string header =
+            fmt::format("--- iteration: {0}, discount-total: {1:.2f} ---\n"
+                        "--- max-delta: {2:.2f}, prev-max-delta: {3:.2f}, "
+                        "iteration-delta: {4} ---",
+                        i,
+                        critter.fitness(),
+                        critter.fitness() - MAX_2019,
+                        critter.fitness() - max_fitness,
+                        i - mut_gap);
 
-        max_fitness = critter.fitness();
-        l = i;
-        mut_gap = i;
+          max_fitness = critter.fitness();
+          mut_low_counter = i;
+          mut_high_counter = i;
+          mut_gap = i;
 
-        ofs << header + "\n";
-        std::cout << header << std::endl;
-        ofs << "lea-number,discount,cost,bucket\n";
+          std::cout << header << std::endl;
+          ofs << "lea-number,discount,cost,do-mutate,bucket\n";
 
-        fmt::memory_buffer row;
-        for (int k = 0; k < N; k++) {
-          fmt::format_to(row,
-                         "{0},{1},{2},{3}\n",
-                         data[k].lea_number,
-                         data[k].discount,
-                         data[k].cost,
-                         std::get<0>(critter.genes()[k]),
-                         std::get<1>(critter.genes()[k]));
-          std::get<0>(critter.genes()[k]) = 1;
+          fmt::memory_buffer row;
+          for (int k = 0; k < N; k++) {
+            fmt::format_to(row,
+                           "{0},{1},{2},{3},{4}\n",
+                           data[k].lea_number,
+                           data[k].discount,
+                           data[k].cost,
+                           std::get<0>(critter.genes()[k]),
+                           std::get<1>(critter.genes()[k]));
+            std::get<0>(critter.genes()[k]) = 1;
+          }
+          ofs << row.data();
+          ofs.close();
         }
-        ofs << row.data();
-        ofs.close();
       }
+    }
+    if ((i - mut_low_counter) > mut_threshold_low) {
+      mut_low_counter = i;
+      mut_high_counter += 1;
+      t_mut_count = static_cast<float>(N * 33) / 100;
+
+    } else if (mut_high_counter > mut_threshold_high) {
+      mut_high_counter = 0;
+      t_mut_count = static_cast<float>(N * 80) / 100;
     }
     mate_critters(data,
                   max_fitness,
                   t_mut_count,
-                  parent_count,
+                  mating_pool_count,
                   N,
                   top_pool,
                   pdistb,
@@ -392,10 +383,9 @@ main(int argc, char** argv)
     "o,out_file", "Output file", cxxopts::value<std::string>())(
     "bucket_count", "Bucket count", cxxopts::value<int>()->default_value("4"))(
     "max_bucket",
-    "Max bucket count",
-    cxxopts::value<int>()->default_value("150"))(
-    "pop_count",
-    "Population count",
+    "Max bucket
+    count ", cxxopts::value<int>()->default_value(" 150 "))( " pop_count ",
+                                                        "Population count",
     cxxopts::value<int>()->default_value("100"))(
     "mut_rate", "Mutation rate", cxxopts::value<int>()->default_value("1"))(
     "mut_threshold_low",
@@ -405,6 +395,9 @@ main(int argc, char** argv)
     "Mutation threshold high",
     cxxopts::value<int>()->default_value("1000000"))(
     "parent_count", "Parent count", cxxopts::value<int>()->default_value("2"))(
+    "mating_pool_count",
+    "Mating pool count",
+    cxxopts::value<int>()->default_value("10"))(
     "iterations",
     "Iterations",
     cxxopts::value<int>()->default_value("1000000"));
@@ -419,8 +412,9 @@ main(int argc, char** argv)
   int pop_count = result["pop_count"].as<int>();
   int mut_rate = result["mut_rate"].as<int>();
   int mut_threshold_low = result["mut_threshold_low"].as<int>();
-  int mut_threshold_high = result["mut_threshold_low"].as<int>();
+  int mut_threshold_high = result["mut_threshold_high"].as<int>();
   int parent_count = result["parent_count"].as<int>();
+  int mating_pool_count = result["mating_pool_count"].as<int>();
   int iterations = result["iterations"].as<int>();
 
   std::vector<erate_t> erate_data;
@@ -446,6 +440,7 @@ main(int argc, char** argv)
                    pop_count,
                    mut_rate,
                    parent_count,
+                   mating_pool_count,
                    iterations,
                    mut_threshold_low,
                    mut_threshold_high,
