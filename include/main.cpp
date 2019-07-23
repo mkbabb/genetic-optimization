@@ -291,7 +291,7 @@ optimize_buckets(std::vector<erate_t> data,
   int mut_count = static_cast<float>(N * mut_rate) / 100;
   double max_fitness = 0;
 
-  std::vector<int> pdistb = { 70, 20, 10 };
+  std::vector<int> pdistb = parent_distb(parent_count);
   std::map<int, std::map<std::string, double>> buckets;
   std::vector<int> full_buckets(bucket_count, 0);
 
