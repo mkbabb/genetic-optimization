@@ -82,7 +82,7 @@ public:
     this->genes(g);
   }
 
-  auto genes() -> std::vector<std::tuple<int, int>> { return _genes; }
+  auto genes() -> std::vector<std::tuple<int, int>>& { return _genes; }
   auto genes() const -> const std::vector<std::tuple<int, int>>
   {
     return _genes;
@@ -238,9 +238,6 @@ mate_critters(std::vector<erate_t>& data,
       parents[j] = critters[r];
     }
 
-    // std::copy(
-    //   begin(parents[0].genes), end(parents[0].genes), begin(child.genes));
-
     mate_t(child, parents, pdistb, N);
 
     for (int j = 0; j < mut_count; j++) {
@@ -294,7 +291,7 @@ optimize_buckets(std::vector<erate_t> data,
   int mut_count = static_cast<float>(N * mut_rate) / 100;
   double max_fitness = 0;
 
-  std::vector<int> pdistb = parent_distb(parent_count);
+  std::vector<int> pdistb = { 70, 20, 10 };
   std::map<int, std::map<std::string, double>> buckets;
   std::vector<int> full_buckets(bucket_count, 0);
 
