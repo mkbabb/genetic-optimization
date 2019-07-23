@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.2)
 project(erate VERSION 0.1.0)
 
 
-set(CMAKE_CXX_COMPILER "/usr/local/Cellar/llvm/8.0.0_1/bin/clang-8")
+set(CMAKE_CXX_COMPILER "/usr/local/Cellar/llvm/8.0.0_1/bin/clang++")
 
-set(COMPILE_FLAGS "-fcoroutines-ts -stdlib=libc++ -std=c++17 -g -O3 -target x86_64-pc-linux-gnu")
+set(COMPILE_FLAGS "-fcoroutines-ts -stdlib=libc++ -std=c++17 -g -O3")
 set(LINK_FLAGS "${LINK_FLAGS} -stdlib=libc++")
 
 include_directories(/usr/local/Cellar/llvm/8.0.0_1/include/c++/v1)

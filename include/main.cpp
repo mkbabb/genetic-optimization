@@ -380,17 +380,4 @@ main()
                    iterations,
                    mut_threshold,
                    max_bucket);
-
-  //   int n = 32;
-  //   int lgn = log2(n);
-
-  //   auto t = de_bruijn(2, lgn);
-  //   int db = std::stoi(t, 0, 2);
-
-  //   std::cout << t << std::endl;
-
-  //   auto tab = tabn(n, db);
-
-  //   std::cout << ranges::join(tab, ", ") << std::endl;
-  //   return 0;
 }
