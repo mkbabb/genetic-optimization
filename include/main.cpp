@@ -121,7 +121,6 @@ calc_erate_stats(std::vector<erate_t>& data,
     bucket["total_discount"] += data[i].discount;
     bucket["count"]++;
 
-    std::get<0>(critter.genes()[i]) = std::get<0>(critter.genes()[i]) ? 1 : 0;
     std::get<1>(critter.genes()[i]) = j;
   }
 
@@ -129,7 +128,7 @@ calc_erate_stats(std::vector<erate_t>& data,
   for (auto& [_, bucket] : buckets) {
     if (bucket["count"] > 0) {
       bucket["average_discount"] =
-        double_round((bucket["total_discount"] / (bucket["count"] * 100)), 2);
+        double_round((bucket["total_discount"] / (bucket["count"] * 100)), 3);
       bucket["discount_cost"] =
         bucket["average_discount"] * bucket["total_cost"];
       fitness += bucket["discount_cost"];
@@ -223,11 +222,12 @@ make_genes(std::vector<erate_t>& data, int bucket_count)
 
   for (auto d : data) {
     std::tuple<int, int> tup;
-    if (d.do_mutate) {
-      tup = std::make_tuple(d.do_mutate, d.bucket);
-    } else {
-      tup = std::make_tuple(0, 0);
-    }
+    tup = std::make_tuple(0, 0);
+    // if (d.do_mutate) {
+    //   tup = std::make_tuple(d.do_mutate, d.bucket);
+    // } else {
+    //   tup = std::make_tuple(0, 0);
+    // }
     genes.push_back(tup);
   }
   return genes;
@@ -260,8 +260,7 @@ optimize_buckets(std::vector<erate_t> data,
   std::vector<int> pdistb = parent_distb(parent_count);
   std::map<int, std::map<std::string, double>> buckets;
 
-  random_t::Random rng1(rng_state, random_t::lcg_xor_rot);
-  random_t::Random rng2(rng_state ^ 0xBEEF, random_t::lcg_xor_rot);
+  random_t::Random rng(rng_state, random_t::lcg_xor_rot);
 
   double max_fitness = 0;
   for (int i = 0; i < bucket_count; i++) {
@@ -282,7 +281,7 @@ optimize_buckets(std::vector<erate_t> data,
   for (int i = 0; i < iterations; i++) {
     for (auto& critter : critters) {
       if (!critter.skip()) {
-        calc_erate_stats(data, buckets, critter, max_bucket, rng1);
+        calc_erate_stats(data, buckets, critter, max_bucket, rng);
 
         if (critter.fitness() > max_fitness) {
           ofs.open(out_file, std::ios::trunc);
@@ -296,7 +295,7 @@ optimize_buckets(std::vector<erate_t> data,
                         critter.fitness() - MAX_2019,
                         critter.fitness() - max_fitness,
                         i - mutation_gap,
-                        rng1.state());
+                        rng.state());
 
           max_fitness = critter.fitness();
           mutation_low_counter = i;
@@ -338,7 +337,7 @@ optimize_buckets(std::vector<erate_t> data,
                   t_mutation_count,
                   mating_pool_count,
                   top_pool,
-                  rng2);
+                  rng);
     t_mutation_count = mutation_count;
   }
 }
