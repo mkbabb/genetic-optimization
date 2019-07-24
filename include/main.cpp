@@ -3,7 +3,7 @@
 #include "csv.hpp"
 #include "cxxopts.hpp"
 #include "fmt/format.h"
-#include "rng/rng.hpp"
+#include "random_t/random_t.hpp"
 #include "tupletools.hpp"
 #include "utils.cpp"
 #include <algorithm>
@@ -86,60 +86,6 @@ public:
 };
 
 auto
-calc_erate_stats(std::vector<erate_t>& data,
-                 int bucket_count,
-                 int max_bucket,
-                 int N,
-                 Critter& critter,
-                 std::map<int, std::map<std::string, double>>& buckets,
-                 std::vector<int>& full_buckets) -> void
-{
-  int blog = ilog2(bucket_count) - 1;
-
-  for (int i = 0; i < N; i++) {
-    int j =
-      std::get<0>(critter.genes()[i])
-        ? std::get<1>(critter.genes()[i])
-        : blog != -1 ? rand2m(blog) : randrange(0, bucket_count, lcg_xor_rot);
-
-    if (full_buckets[j]) {
-      while (full_buckets[j]) {
-        j = blog != -1 ? rand2m(blog) : randrange(0, bucket_count, lcg_xor_rot);
-      }
-    }
-
-    auto& b = buckets[j];
-    b["total_cost"] += data[i].cost;
-    b["total_discount"] += data[i].discount;
-    b["count"] += 1;
-
-    if (b["count"] > max_bucket) {
-      full_buckets[j] = 1;
-    }
-    std::get<0>(critter.genes()[i]) = std::get<0>(critter.genes()[i]) ? 1 : 0;
-    std::get<1>(critter.genes()[i]) = j;
-  }
-
-  double fitness = 0;
-  for (int i = 0; i < bucket_count; i++) {
-    auto& b = buckets[i];
-    if (b["count"] > 0) {
-      b["average_discount"] =
-        double_round((b["total_discount"] / (b["count"] * 100)), 2);
-      b["discount_cost"] = b["average_discount"] * b["total_cost"];
-
-      fitness += b["discount_cost"];
-      full_buckets[i] = 0;
-
-      for (auto& [key, value] : b) {
-        b[key] = 0;
-      }
-    }
-    critter.fitness(fitness);
-  }
-}
-
-auto
 parent_distb(int N) -> std::vector<int>
 {
 
@@ -154,40 +100,61 @@ parent_distb(int N) -> std::vector<int>
   }
 }
 
-// auto
-// parent_distb(int N) -> std::vector<int>
-// {
-//   std::vector<int> t(N);
+template<typename T>
+void
+calc_erate_stats(std::vector<erate_t>& data,
+                 std::map<int, std::map<std::string, double>>& buckets,
+                 Critter& critter,
+                 int max_bucket,
+                 T& rng)
+{
 
-//   if (N == 1) {
-//     t[0] = 1;
-//   } else {
-//     int first = 80;
-//     int second = 20;
-//     int third = 10;
+  for (int i = 0; i < data.size(); i++) {
+    int j = std::get<0>(critter.genes()[i]) ? std::get<1>(critter.genes()[i])
+                                            : rng.randrange(0, buckets.size());
+    while (buckets[j]["count"] >= max_bucket) {
+      j = rng.randrange(0, buckets.size());
+    }
+    auto& bucket = buckets[j];
 
-//     t[0] = first - 10 * (N - 2);
-//     t[1] = second;
-//     for (int i = 0; i < N - 3; i++) {
-//       t[i] = third;
-//     }
-//   }
-//   return t;
-// }
+    bucket["total_cost"] += data[i].cost;
+    bucket["total_discount"] += data[i].discount;
+    bucket["count"]++;
 
+    std::get<0>(critter.genes()[i]) = std::get<0>(critter.genes()[i]) ? 1 : 0;
+    std::get<1>(critter.genes()[i]) = j;
+  }
+
+  double fitness = 0;
+  for (auto& [_, bucket] : buckets) {
+    if (bucket["count"] > 0) {
+      bucket["average_discount"] =
+        double_round((bucket["total_discount"] / (bucket["count"] * 100)), 2);
+      bucket["discount_cost"] =
+        bucket["average_discount"] * bucket["total_cost"];
+      fitness += bucket["discount_cost"];
+    }
+    for (auto& [key, value] : bucket) {
+      value = 0;
+    }
+  }
+  critter.fitness(fitness);
+}
+
+template<typename T>
 void
 mate_t(Critter& child,
        std::vector<Critter>& parents,
        std::vector<int>& pdistb,
-       int N)
+       T& rng)
 {
   std::sort(begin(parents), end(parents), [](auto c1, auto c2) {
     return c1.fitness() > c2.fitness();
   });
   int parent = 0;
 
-  for (int i = 0; i < N; i++) {
-    int r = randrange(0, 100, lcg_xor_rot);
+  for (int i = 0; i < child.genes().size(); i++) {
+    int r = rng.randrange(0, 100);
     int start = 0;
 
     for (int j = 0; j < pdistb.size(); j++) {
@@ -203,16 +170,18 @@ mate_t(Critter& child,
   }
 }
 
+template<typename T>
 void
 mate_critters(std::vector<erate_t>& data,
-              int max_fitness,
-              int mut_count,
-              int mating_pool_count,
-              int N,
-              int top_pool,
               std::vector<int>& pdistb,
-              std::vector<Critter>& critters)
+              std::vector<Critter>& critters,
+              int max_fitness,
+              int mutation_count,
+              int mating_pool_count,
+              int top_pool,
+              T& rng)
 {
+  int N = data.size();
   int M = critters.size();
 
   std::sort(begin(critters), end(critters), [](auto c1, auto c2) {
@@ -230,15 +199,15 @@ mate_critters(std::vector<erate_t>& data,
     Critter child(N);
 
     for (int j = 0; j < mating_pool_count; j++) {
-      int r = randrange(0, M - 1, lcg_xor_rot);
+      int r = rng.randrange(0, M);
       parents[j] = critters[r];
     }
 
-    mate_t(child, parents, pdistb, N);
+    mate_t(child, parents, pdistb, rng);
 
-    for (int j = 0; j < mut_count; j++) {
-      int k = randrange(0, N, lcg_xor_rot);
-      std::get<0>(child.genes()[k]) = randrange(0, 1, lcg_xor_rot);
+    for (int j = 0; j < mutation_count; j++) {
+      int k = rng.randrange(0, M);
+      std::get<0>(child.genes()[k]) = rng.randrange(0, 1);
     }
     children.push_back(child);
   }
@@ -251,8 +220,6 @@ make_genes(std::vector<erate_t>& data, int bucket_count)
 {
   std::vector<std::tuple<int, int>> genes;
   genes.reserve(data.size());
-
-  int blog = ilog2(bucket_count) - 1;
 
   for (auto d : data) {
     std::tuple<int, int> tup;
@@ -270,30 +237,33 @@ void
 optimize_buckets(std::vector<erate_t> data,
                  std::string out_file,
                  int bucket_count,
-                 int pop_count,
-                 int mut_rate,
+                 int max_bucket,
+                 int population_count,
+                 int mutation_rate,
+                 int mutation_threshold_low,
+                 int mutation_threshold_high,
                  int parent_count,
                  int mating_pool_count,
                  int iterations,
-                 int mut_threshold_low,
-                 int mut_threshold_high,
-                 int max_bucket)
+                 uint64_t rng_state)
 {
   std::ofstream ofs;
 
   int N = data.size();
-  int top_pool = pop_count / 10;
-  max_bucket = std::max(max_bucket, N / bucket_count);
+  int top_pool = population_count / 10;
+  int mutation_count = static_cast<float>(N * mutation_rate) / 100;
   mating_pool_count = std::min(mating_pool_count, N - 1);
-  mut_threshold_high =
-    static_cast<float>(mut_threshold_high) / mut_threshold_low;
-  int mut_count = static_cast<float>(N * mut_rate) / 100;
-  double max_fitness = 0;
+  mutation_threshold_high =
+    static_cast<float>(mutation_threshold_high) / mutation_threshold_low;
+  max_bucket = std::max(max_bucket, N / bucket_count);
 
   std::vector<int> pdistb = parent_distb(parent_count);
   std::map<int, std::map<std::string, double>> buckets;
-  std::vector<int> full_buckets(bucket_count, 0);
 
+  random_t::Random rng1(rng_state, random_t::lcg_xor_rot);
+  random_t::Random rng2(rng_state ^ 0xBEEF, random_t::lcg_xor_rot);
+
+  double max_fitness = 0;
   for (int i = 0; i < bucket_count; i++) {
     buckets[i] = std::map<std::string, double>{ { "average_discount", 0 },
                                                 { "total_discount", 0 },
@@ -301,38 +271,37 @@ optimize_buckets(std::vector<erate_t> data,
                                                 { "discount_cost", 0 },
                                                 { "count", 0 } };
   }
-
   std::vector<std::tuple<int, int>> genes = make_genes(data, bucket_count);
-  std::vector<Critter> critters(pop_count, { N, genes });
+  std::vector<Critter> critters(population_count, { N, genes });
 
-  int mut_low_counter = 0;
-  int mut_high_counter = 0;
-  int mut_gap = 0;
-  int t_mut_count = mut_count;
+  int mutation_low_counter = 0;
+  int mutation_high_counter = 0;
+  int mutation_gap = 0;
+  int t_mutation_count = mutation_count;
 
   for (int i = 0; i < iterations; i++) {
     for (auto& critter : critters) {
       if (!critter.skip()) {
-        calc_erate_stats(
-          data, bucket_count, max_bucket, N, critter, buckets, full_buckets);
+        calc_erate_stats(data, buckets, critter, max_bucket, rng1);
 
         if (critter.fitness() > max_fitness) {
           ofs.open(out_file, std::ios::trunc);
 
           std::string header =
-            fmt::format("--- iteration: {0}, discount-total: {1:.2f} ---\n"
-                        "--- max-delta: {2:.2f}, prev-max-delta: {3:.2f}, "
-                        "iteration-delta: {4} ---",
+            fmt::format("\niteration: {0}, discount-total: {1:.2f}\n"
+                        "max-delta: {2:.2f}, prev-max-delta: {3:.2f}\n"
+                        "iteration-delta: {4}, rng-state: {5}",
                         i,
                         critter.fitness(),
                         critter.fitness() - MAX_2019,
                         critter.fitness() - max_fitness,
-                        i - mut_gap);
+                        i - mutation_gap,
+                        rng1.state());
 
           max_fitness = critter.fitness();
-          mut_low_counter = i;
-          mut_high_counter = i;
-          mut_gap = i;
+          mutation_low_counter = i;
+          mutation_high_counter = i;
+          mutation_gap = i;
 
           std::cout << header << std::endl;
           ofs << "lea-number,discount,cost,do-mutate,bucket\n";
@@ -353,45 +322,51 @@ optimize_buckets(std::vector<erate_t> data,
         }
       }
     }
-    if ((i - mut_low_counter) > mut_threshold_low) {
-      mut_low_counter = i;
-      mut_high_counter += 1;
-      t_mut_count = static_cast<float>(N * 33) / 100;
+    if ((i - mutation_low_counter) > mutation_threshold_low) {
+      mutation_low_counter = i;
+      mutation_high_counter += 1;
+      t_mutation_count = static_cast<float>(N * 33) / 100;
 
-    } else if (mut_high_counter > mut_threshold_high) {
-      mut_high_counter = 0;
-      t_mut_count = static_cast<float>(N * 80) / 100;
+    } else if (mutation_high_counter > mutation_threshold_high) {
+      mutation_high_counter = 0;
+      t_mutation_count = static_cast<float>(N * 80) / 100;
     }
     mate_critters(data,
-                  max_fitness,
-                  t_mut_count,
-                  mating_pool_count,
-                  N,
-                  top_pool,
                   pdistb,
-                  critters);
-    t_mut_count = mut_count;
+                  critters,
+                  max_fitness,
+                  t_mutation_count,
+                  mating_pool_count,
+                  top_pool,
+                  rng2);
+    t_mutation_count = mutation_count;
   }
 }
 
 int
 main(int argc, char** argv)
 {
+  /*
+  Argument parsing of argv.
+   */
   cxxopts::Options options("erate", "to optimize data_t");
   options.allow_unrecognised_options().add_options()(
     "i,in_file", "Input file", cxxopts::value<std::string>())(
     "o,out_file", "Output file", cxxopts::value<std::string>())(
     "bucket_count", "Bucket count", cxxopts::value<int>()->default_value("4"))(
     "max_bucket",
-    "Max bucket
-    count ", cxxopts::value<int>()->default_value(" 150 "))( " pop_count ",
-                                                        "Population count",
+    "Max bucket count",
+    cxxopts::value<int>()->default_value("150"))(
+    "population_count",
+    "Population count",
     cxxopts::value<int>()->default_value("100"))(
-    "mut_rate", "Mutation rate", cxxopts::value<int>()->default_value("1"))(
-    "mut_threshold_low",
+    "mutation_rate",
+    "Mutation rate",
+    cxxopts::value<int>()->default_value("1"))(
+    "mutation_threshold_low",
     "Mutation threshold low",
     cxxopts::value<int>()->default_value("100000"))(
-    "mut_threshold_high",
+    "mutation_threshold_high",
     "Mutation threshold high",
     cxxopts::value<int>()->default_value("1000000"))(
     "parent_count", "Parent count", cxxopts::value<int>()->default_value("2"))(
@@ -400,28 +375,22 @@ main(int argc, char** argv)
     cxxopts::value<int>()->default_value("10"))(
     "iterations",
     "Iterations",
-    cxxopts::value<int>()->default_value("1000000"));
+    cxxopts::value<int>()->default_value("1000000"))(
+    "rng_state",
+    "Random number generator state",
+    cxxopts::value<uint64_t>()->default_value("0xDEADBEEF"));
 
   auto result = options.parse(argc, argv);
 
-  std::string in_file = result["in_file"].as<std::string>();
-  std::string out_file = result["out_file"].as<std::string>();
-
-  int bucket_count = result["bucket_count"].as<int>();
-  int max_bucket = result["max_bucket"].as<int>();
-  int pop_count = result["pop_count"].as<int>();
-  int mut_rate = result["mut_rate"].as<int>();
-  int mut_threshold_low = result["mut_threshold_low"].as<int>();
-  int mut_threshold_high = result["mut_threshold_high"].as<int>();
-  int parent_count = result["parent_count"].as<int>();
-  int mating_pool_count = result["mating_pool_count"].as<int>();
-  int iterations = result["iterations"].as<int>();
+  /*
+CSV parsing of in_file.
+ */
 
   std::vector<erate_t> erate_data;
   std::string lea_number;
   int discount, cost, do_mutate, bucket;
 
-  io::CSVReader<5> in(in_file);
+  io::CSVReader<5> in(result["in_file"].as<std::string>());
   in.read_header(io::ignore_extra_column,
                  "lea-number",
                  "discount",
@@ -434,15 +403,20 @@ main(int argc, char** argv)
       erate_t{ lea_number, discount, cost, do_mutate, bucket });
   }
 
+  /*
+  Optimizing function of erate_data.
+   */
+
   optimize_buckets(erate_data,
-                   out_file,
-                   bucket_count,
-                   pop_count,
-                   mut_rate,
-                   parent_count,
-                   mating_pool_count,
-                   iterations,
-                   mut_threshold_low,
-                   mut_threshold_high,
-                   max_bucket);
+                   result["out_file"].as<std::string>(),
+                   result["bucket_count"].as<int>(),
+                   result["max_bucket"].as<int>(),
+                   result["population_count"].as<int>(),
+                   result["mutation_rate"].as<int>(),
+                   result["mutation_threshold_low"].as<int>(),
+                   result["mutation_threshold_high"].as<int>(),
+                   result["parent_count"].as<int>(),
+                   result["mating_pool_count"].as<int>(),
+                   result["iterations"].as<int>(),
+                   result["rng_state"].as<uint64_t>());
 }

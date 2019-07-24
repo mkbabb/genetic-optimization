@@ -1,5 +1,5 @@
-#ifndef RNG_H
-#define RNG_H
+#ifndef RAND_H
+#define RAND_H
 
 #include "lcg.cpp"
 #include "mersenne_twister.cpp"
@@ -10,7 +10,7 @@
 
 #pragma once
 
-namespace rng {
+namespace random_t {
 
 template<typename StateType = uint64_t,
          typename OutputType = uint32_t,
@@ -18,7 +18,7 @@ template<typename StateType = uint64_t,
 class Random
 {
   StateType _state;
-  DriverType _rng;
+  DriverType&& _rng;
 
 public:
   Random(StateType state)
@@ -26,10 +26,10 @@ public:
   {
     _rng = lcg_xor_rot;
   };
-  Random(DriverType rng)
+  Random(DriverType&& rng)
     : _state(static_cast<uint64_t>(1))
     , _rng(rng){};
-  Random(StateType state, DriverType rng)
+  Random(StateType state, DriverType&& rng)
     : _state(state)
     , _rng(rng){};
 
@@ -73,4 +73,4 @@ public:
   };
 };
 }
-#endif // RNG_H
+#endif // RAND_H

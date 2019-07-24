@@ -1,5 +1,6 @@
 #include <cstdint>
 
+namespace random_t {
 uint32_t
 xorshift32(uint32_t* state)
 {
@@ -51,3 +52,4 @@ xorwow(struct xorwow_state* state)
   state->counter += 362437;
   return t + state->counter;
 }
+};

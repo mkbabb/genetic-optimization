@@ -5,7 +5,7 @@
 #include "../fmt/format.h"
 #include "../tupletools.hpp"
 #include "../utils.cpp"
-#include "rng.hpp"
+#include "random_t.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -18,6 +18,8 @@
 #include <tuple>
 #include <type_traits>
 #include <vector>
+
+using namespace random_t;
 
 template<class Func, class Output = typename std::result_of<Func(void)>::type>
 double
@@ -58,7 +60,7 @@ rand_tests(int a, int b, int N)
     uint64_t state1 = 0xDEADBEEF;
 
     auto mt = [&](auto s) { return _mt(); };
-    rng::Random r1(state1, mt);
+    Random r1(state1, mt);
 
     fmt::print("\n--- MT19937; randrange ---\n");
     rand_loop([&]() { return r1.randrange(a, b); }, N);
@@ -67,41 +69,41 @@ rand_tests(int a, int b, int N)
   }
   {
     uint64_t state1 = 0xDEADBEEF;
-    rng::Random r1(state1, lcg_xor_rot);
+    Random r1(state1, lcg_xor_rot);
 
     fmt::print("\n--- lcg_xor_rot; randrange ---\n");
     rand_loop([&]() { return r1.randrange(a, b); }, N);
     fmt::print("\n--- lcg_xor_rot; 2m ---\n");
     rand_loop([&]() { return r1.rand2m(8); }, N);
   }
-//   {
+  {
 
-//     uint64_t state1 = 0xDEADBEEF;
-//     rng::Random r1(state1, minstd_rand);
+    uint64_t state1 = 0xDEADBEEF;
+    Random r1(state1, minstd_rand);
 
-//     fmt::print("\n--- minstd_rand; randrange ---\n");
-//     rand_loop([&]() { return r1.randrange(a, b); }, N);
-//     fmt::print("\n--- minstd_rand; 2m ---\n");
-//     rand_loop([&]() { return r1.rand2m(8); }, N);
-//   }
-//   {
-//     uint64_t state1 = 0xDEADBEEF;
-//     rng::Random r1(state1, lcg_0);
+    fmt::print("\n--- minstd_rand; randrange ---\n");
+    rand_loop([&]() { return r1.randrange(a, b); }, N);
+    fmt::print("\n--- minstd_rand; 2m ---\n");
+    rand_loop([&]() { return r1.rand2m(8); }, N);
+  }
+  {
+    uint64_t state1 = 0xDEADBEEF;
+    Random r1(state1, lcg_0);
 
-//     fmt::print("\n--- lcg_0; randrange ---\n");
-//     rand_loop([&]() { return r1.randrange(a, b); }, N);
-//     fmt::print("\n--- lcg_0; 2m ---\n");
-//     rand_loop([&]() { return r1.rand2m(8); }, N);
-//   }
-//   {
-//     uint64_t state1 = 0xDEADBEEF;
-//     rng::Random r1(state1, xorshift64s);
+    fmt::print("\n--- lcg_0; randrange ---\n");
+    rand_loop([&]() { return r1.randrange(a, b); }, N);
+    fmt::print("\n--- lcg_0; 2m ---\n");
+    rand_loop([&]() { return r1.rand2m(8); }, N);
+  }
+  {
+    uint64_t state1 = 0xDEADBEEF;
+    Random r1(state1, xorshift64s);
 
-//     fmt::print("\n--- xorshift64s; randrange ---\n");
-//     rand_loop([&]() { return r1.randrange(a, b); }, N);
-//     fmt::print("\n--- xorshift64s; 2m ---\n");
-//     rand_loop([&]() { return r1.rand2m(8); }, N);
-//   }
+    fmt::print("\n--- xorshift64s; randrange ---\n");
+    rand_loop([&]() { return r1.randrange(a, b); }, N);
+    fmt::print("\n--- xorshift64s; 2m ---\n");
+    rand_loop([&]() { return r1.rand2m(8); }, N);
+  }
 }
 
 int

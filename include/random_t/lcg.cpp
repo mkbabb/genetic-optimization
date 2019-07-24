@@ -1,5 +1,6 @@
 #include <cstdint>
 
+namespace random_t {
 uint32_t
 lcg_0(uint64_t* state)
 {
@@ -57,4 +58,5 @@ lcg_xor_rot(uint64_t* state)
   uint32_t out = (xorshifted << (32U - rot)) | (xorshifted >> rot);
 
   return out;
+}
 }
