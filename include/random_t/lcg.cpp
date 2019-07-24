@@ -59,4 +59,18 @@ lcg_xor_rot(uint64_t* state)
 
   return out;
 }
+
+// uint32_t
+// lcg_xor_rot(uint64_t* state)
+// {
+//   uint64_t a = 6364136223846793005ULL;
+//   uint64_t b = 11;
+
+//   uint64_t t_state = *state;
+//   *state = (a * (*state)) + b;
+
+//   uint32_t xorshifted = ((t_state >> 18) ^ t_state) >> 27;
+//   uint32_t rot = t_state >> 59;
+//   return (xorshifted << (32 - rot)) | (xorshifted >> rot);
+// }
 }

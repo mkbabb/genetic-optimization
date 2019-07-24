@@ -25,7 +25,7 @@ constexpr int MAX_2019 = 15'034'520;
 struct erate_t
 {
   std::string lea_number;
-  int discount, cost, do_mutate, bucket;
+  int discount, cost, no_mutate, bucket;
 };
 
 class Critter
@@ -92,7 +92,7 @@ parent_distb(int N) -> std::vector<int>
   int slice = ceil(100.0 / N);
   if (N * slice > 100) {
     std::vector<int> t(N, slice);
-    t[N - 1] = (100 - (N * (slice - 1)));
+    t[N - 1] = (100 - slice * (N - 1));
     return t;
   } else {
     std::vector<int> t(N, slice);
@@ -174,6 +174,7 @@ void
 mate_critters(std::vector<erate_t>& data,
               std::vector<int>& pdistb,
               std::vector<Critter>& critters,
+              int bucket_count,
               int max_fitness,
               int mutation_count,
               int mating_pool_count,
@@ -190,6 +191,7 @@ mate_critters(std::vector<erate_t>& data,
   std::vector<Critter> children(begin(critters), begin(critters) + top_pool);
   std::vector<Critter> parents(begin(critters),
                                begin(critters) + mating_pool_count);
+  children.reserve(N);
   for (auto& child : children) {
     child.skip(true);
   }
@@ -205,8 +207,9 @@ mate_critters(std::vector<erate_t>& data,
     mate_t(child, parents, pdistb, rng);
 
     for (int j = 0; j < mutation_count; j++) {
-      int k = rng.randrange(0, M);
-      std::get<0>(child.genes()[k]) = rng.randrange(0, 1);
+      int r = rng.randrange(0, N);
+      std::get<0>(child.genes()[r]) ^= 1;
+      //   std::get<1>(child.genes()[r]) = rng.randrange(0, bucket_count);
     }
     children.push_back(child);
   }
@@ -222,12 +225,11 @@ make_genes(std::vector<erate_t>& data, int bucket_count)
 
   for (auto d : data) {
     std::tuple<int, int> tup;
-    tup = std::make_tuple(0, 0);
-    // if (d.do_mutate) {
-    //   tup = std::make_tuple(d.do_mutate, d.bucket);
-    // } else {
-    //   tup = std::make_tuple(0, 0);
-    // }
+    if (d.no_mutate) {
+      tup = std::make_tuple(d.no_mutate, d.bucket);
+    } else {
+      tup = std::make_tuple(0, 0);
+    }
     genes.push_back(tup);
   }
   return genes;
@@ -273,8 +275,8 @@ optimize_buckets(std::vector<erate_t> data,
   std::vector<std::tuple<int, int>> genes = make_genes(data, bucket_count);
   std::vector<Critter> critters(population_count, { N, genes });
 
-  int mutation_low_counter = 0;
-  int mutation_high_counter = 0;
+  int mutation_counter_low = 0;
+  int mutation_counter_high = 0;
   int mutation_gap = 0;
   int t_mutation_count = mutation_count;
 
@@ -298,8 +300,8 @@ optimize_buckets(std::vector<erate_t> data,
                         rng.state());
 
           max_fitness = critter.fitness();
-          mutation_low_counter = i;
-          mutation_high_counter = i;
+          mutation_counter_low = i;
+          mutation_counter_high = 0;
           mutation_gap = i;
 
           std::cout << header << std::endl;
@@ -321,18 +323,28 @@ optimize_buckets(std::vector<erate_t> data,
         }
       }
     }
-    if ((i - mutation_low_counter) > mutation_threshold_low) {
-      mutation_low_counter = i;
-      mutation_high_counter += 1;
-      t_mutation_count = static_cast<float>(N * 33) / 100;
-
-    } else if (mutation_high_counter > mutation_threshold_high) {
-      mutation_high_counter = 0;
-      t_mutation_count = static_cast<float>(N * 80) / 100;
+    if ((i - mutation_counter_low) >= mutation_threshold_low) {
+      mutation_counter_low = i;
+      mutation_counter_high += 1;
+      t_mutation_count = static_cast<float>(N * 3) / 100;
+      fmt::print("\n***Low threshold met! Mutating by 33%... {0}/{1}***\n",
+                 mutation_counter_high,
+                 mutation_threshold_high);
+      fmt::print("iteration: {0}, iteration-delta: {1}", i, i - mutation_gap);
+      for (auto& critter : critters) {
+        fmt::print("critter fitness: {0}, max-ratio: {1}",
+                   critter.fitness(),
+                   critter.fitness() / max_fitness);
+      };
+    } else if (mutation_counter_high >= mutation_threshold_high) {
+      mutation_counter_high = 0;
+      t_mutation_count = static_cast<float>(N * 9) / 100;
+      fmt::print("\n***High threshold met! Mutating by 80%...***\n");
     }
     mate_critters(data,
                   pdistb,
                   critters,
+                  bucket_count,
                   max_fitness,
                   t_mutation_count,
                   mating_pool_count,
@@ -387,7 +399,7 @@ CSV parsing of in_file.
 
   std::vector<erate_t> erate_data;
   std::string lea_number;
-  int discount, cost, do_mutate, bucket;
+  int discount, cost, no_mutate, bucket;
 
   io::CSVReader<5> in(result["in_file"].as<std::string>());
   in.read_header(io::ignore_extra_column,
@@ -397,9 +409,9 @@ CSV parsing of in_file.
                  "do-mutate",
                  "bucket");
 
-  while (in.read_row(lea_number, discount, cost, do_mutate, bucket)) {
+  while (in.read_row(lea_number, discount, cost, no_mutate, bucket)) {
     erate_data.push_back(
-      erate_t{ lea_number, discount, cost, do_mutate, bucket });
+      erate_t{ lea_number, discount, cost, no_mutate, bucket });
   }
 
   /*

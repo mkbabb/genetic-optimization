@@ -18,7 +18,7 @@ template<typename StateType = uint64_t,
 class Random
 {
   StateType _state;
-  DriverType&& _rng;
+  DriverType& _rng;
 
 public:
   Random(StateType state)
@@ -26,12 +26,19 @@ public:
   {
     _rng = lcg_xor_rot;
   };
-  Random(DriverType&& rng)
+  Random(StateType* state)
+    : Random(*state){};
+
+  Random(DriverType& rng)
     : _state(static_cast<uint64_t>(1))
     , _rng(rng){};
-  Random(StateType state, DriverType&& rng)
+
+  Random(StateType state, DriverType& rng)
     : _state(state)
     , _rng(rng){};
+
+  Random(StateType* state, DriverType& rng)
+    : Random(*state, rng){};
 
   StateType state() { return _state; };
   StateType state() const { return _state; };
