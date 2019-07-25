@@ -7,7 +7,7 @@ do
     do
         for k in {1..2}
         do
-            echo ./build/erate -i erate-data/erate-2019-start.csv -o ./erate-data/out-$n.csv --bucket_count $i --population_count 200 --max_bucket 200 --parent_count $j --mating_pool_count 20 --mutation_rate $k --mutation_threshold_low 100000 --mutation_threshold_high 500000 --iterations 100000000 > ./erate-data/console-$n.txt &
+            echo ./erate.so -i erate-data/erate-2019-start.csv -o ./erate-data/out-$n.csv --bucket_count $i --population_count 200 --max_bucket 200 --parent_count $j --mating_pool_count 20 --mutation_rate $k --mutation_threshold_low 100000 --mutation_threshold_high 500000 --iterations 100000000 > ./erate-data/console-$n.txt &
             ((n++))
         done
     done
