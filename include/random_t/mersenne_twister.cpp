@@ -1,8 +1,6 @@
-//
-// Created by Michael Babb on 2019-01-19.
-//
-
 #include "mersenne_twister.hpp"
+
+using namespace random_t;
 
 template<typename CastType>
 void

@@ -4,6 +4,10 @@
 #include <cstdint>
 #include <vector>
 
+#pragma once
+
+namespace random_t {
+
 template<typename CastType = uint32_t>
 class MT19937_N
 {
@@ -28,5 +32,6 @@ public:
 private:
   void generate();
 };
+}
 
 #endif // MERSENNE_TWISTER_H

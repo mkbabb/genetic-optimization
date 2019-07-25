@@ -256,14 +256,14 @@ def test_rand(N, b, plot=False):
 # test_rand(1000, 5, True)
 
 
-data = pd.read_csv("erate-data-2015.csv",
-                   header=0)
-print(data)
+# data = pd.read_csv("erate-data-2015.csv",
+#                    header=0)
+# print(data)
 
-optimize_buckets(data,
-                 bucket_count=2,
-                 max_bucket=100,
-                 population_size=100,
-                 mutation_rate=0.3,
-                 parent_count=2,
-                 iterations=1000)
+# optimize_buckets(data,
+#                  bucket_count=2,
+#                  max_bucket=100,
+#                  population_size=100,
+#                  mutation_rate=0.3,
+#                  parent_count=2,
+#                  iterations=1000)

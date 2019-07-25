@@ -1,7 +1,8 @@
 #include <cstdint>
 
-auto
-xorshift32(uint32_t* state) -> uint32_t
+namespace random_t {
+uint32_t
+xorshift32(uint32_t* state)
 {
   *state ^= (*state << 13);
   *state ^= (*state >> 17);
@@ -9,8 +10,8 @@ xorshift32(uint32_t* state) -> uint32_t
   return *state;
 }
 
-auto
-xorshift64(uint64_t* state) -> uint64_t
+uint64_t
+xorshift64(uint64_t* state)
 {
   *state ^= (*state << 13);
   *state ^= (*state >> 7);
@@ -18,8 +19,8 @@ xorshift64(uint64_t* state) -> uint64_t
   return *state;
 }
 
-auto
-xorshift64s(uint64_t* state) -> uint64_t
+uint64_t
+xorshift64s(uint64_t* state)
 {
   *state ^= *state >> 12;
   *state ^= *state << 25;
@@ -33,8 +34,8 @@ struct xorwow_state
   uint32_t counter;
 };
 
-auto
-xorwow(struct xorwow_state* state) -> uint32_t
+uint32_t
+xorwow(struct xorwow_state* state)
 {
   uint32_t t = state->w;
 
@@ -51,3 +52,4 @@ xorwow(struct xorwow_state* state) -> uint32_t
   state->counter += 362437;
   return t + state->counter;
 }
+};

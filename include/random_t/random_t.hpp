@@ -1,39 +1,83 @@
-#ifndef RANDOM_H
-#define RANDOM_H
+#ifndef RAND_H
+#define RAND_H
 
+#include "lcg.cpp"
 #include "mersenne_twister.cpp"
+#include "xor_shift.cpp"
+#include <cmath>
 #include <cstdint>
 #include <functional>
-#include <vector>
 
-template<typename Dtype = int, typename CastType = uint32_t>
+#pragma once
+
+namespace random_t {
+
+template<typename StateType = uint64_t,
+         typename OutputType = uint32_t,
+         typename DriverType = typename std::function<OutputType(StateType*)>>
 class Random
 {
-private:
-  CastType _seed = 5489;
-  MT19937_N<CastType>* mt;
-
-  void init_mt();
+  StateType _state;
+  DriverType& _rng;
 
 public:
-  typedef std::function<Dtype()> DriverType;
+  Random(StateType state)
+    : _state(state)
+  {
+    _rng = lcg_xor_rot;
+  };
+  Random(StateType* state)
+    : Random(*state){};
 
-  Random();
+  Random(DriverType& rng)
+    : _state(static_cast<uint64_t>(1))
+    , _rng(rng){};
 
-  ~Random();
+  Random(StateType state, DriverType& rng)
+    : _state(state)
+    , _rng(rng){};
 
-  void seed(CastType seed);
+  Random(StateType* state, DriverType& rng)
+    : Random(*state, rng){};
 
-  CastType random();
-  CastType random(DriverType d);
+  StateType state() { return _state; };
+  StateType state() const { return _state; };
+  void state(StateType state) { _state = state; };
 
-  Dtype unit();
-  Dtype db_modulo_twice(CastType range);
+  OutputType generate()
+  {
+    OutputType t = _rng(&_state);
+    return t;
+  };
 
-  std::vector<Dtype> randrange(Dtype a, Dtype b, size_t N);
-  std::vector<Dtype> randrange(size_t N, DriverType d);
+  OutputType operator()() { return this->generate(); };
 
-  Dtype uniform(Dtype a = 0, Dtype b = 1);
+  OutputType rand2m(uint8_t m)
+  {
+    return this->generate() >> (sizeof(OutputType) - (m + 1));
+  };
+
+  OutputType bounded_rand(OutputType range)
+  {
+    OutputType t = (-range) % range;
+    while (true) {
+      OutputType r = this->generate();
+      if (r >= t)
+        return r % range;
+    }
+  };
+
+  OutputType randrange(OutputType a, OutputType b)
+  {
+    OutputType range = b - a;
+    return bounded_rand(range) + a;
+  };
+
+  double unit(uint64_t interval = 0x7FFFFFF)
+  {
+    double i = static_cast<double>(interval);
+    return this->generate() / i;
+  };
 };
-
-#endif // RANDOM_H
+}
+#endif // RAND_H

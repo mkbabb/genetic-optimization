@@ -4,6 +4,7 @@
 #include <iostream>
 #include <list>
 #include <numeric>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -31,23 +32,56 @@
 namespace tupletools {
 template<std::size_t... Ix, class F>
 constexpr auto
-apply_impl(F func, std::index_sequence<Ix...>)
+index_apply_impl(F func, std::index_sequence<Ix...>)
 {
   return func(std::integral_constant<size_t, Ix>{}...);
 }
 
 template<size_t N, class F>
 constexpr auto
-apply(F func)
+index_apply(F func)
 {
-  return apply_impl(func, std::make_index_sequence<N>{});
+  return index_apply_impl(func, std::make_index_sequence<N>{});
+}
+
+template<class Tuple, class F>
+constexpr auto
+apply(Tuple t, F f)
+{
+  return index_apply<std::tuple_size<Tuple>{}>(
+    [&](auto... Is) { return f(std::get<Is>(t)...); });
+}
+
+struct nullptr_t
+{
+  int t = 0;
+};
+
+template<const std::size_t N, const std::size_t M, class... Ts, class Func>
+constexpr auto
+foreach_impl(std::tuple<Ts...>& tup, Func func)
+{
+  if constexpr (N == M) {
+    return;
+  } else {
+    auto& val = std::get<N>(tup);
+    func(val, N);
+    return foreach_impl<N + 1, M>(tup, func);
+  };
+};
+
+template<class... Ts, class Func>
+void foreach (std::tuple<Ts...>& tup, Func func)
+{
+  foreach_impl<0, sizeof...(Ts)>(tup, func);
+  return;
 }
 
 template<class Tuple>
 constexpr auto
 reverse(Tuple tup)
 {
-  return apply<std::tuple_size<Tuple>{}>([&tup](auto... Ix) {
+  return index_apply<std::tuple_size<Tuple>{}>([&tup](auto... Ix) {
     return std::make_tuple(
       std::get<std::tuple_size<Tuple>{} - (Ix + 1)>(tup)...);
   });
@@ -59,14 +93,15 @@ transpose(Tuples... tup)
 {
   constexpr size_t len = std::min({ std::tuple_size<Tuples>{}... });
   auto row = [&](auto Ix) { return std::make_tuple(std::get<Ix>(tup)...); };
-  return apply<len>([&](auto... Ixs) { return std::make_tuple(row(Ixs)...); });
+  return index_apply<len>(
+    [&](auto... Ixs) { return std::make_tuple(row(Ixs)...); });
 }
 
 template<class... Ts>
 constexpr auto
 deref(std::tuple<Ts...>& tup)
 {
-  return apply<sizeof...(Ts)>([&tup](auto... Ixs) {
+  return index_apply<sizeof...(Ts)>([&tup](auto... Ixs) {
     return std::forward_as_tuple(*std::get<Ixs>(tup)...);
   });
 }
@@ -75,7 +110,7 @@ template<class... Ts>
 constexpr auto
 deref(const std::tuple<Ts...>& tup)
 {
-  return apply<sizeof...(Ts)>([&tup](auto... Ixs) {
+  return index_apply<sizeof...(Ts)>([&tup](auto... Ixs) {
     return std::forward_as_tuple(*std::get<Ixs>(tup)...);
   });
 }
@@ -84,7 +119,7 @@ template<class... Ts>
 constexpr auto
 increment_ref(std::tuple<Ts...>& tup)
 {
-  return apply<sizeof...(Ts)>([&tup](auto... Ixs) {
+  return index_apply<sizeof...(Ts)>([&tup](auto... Ixs) {
     (void)std::initializer_list<int>{ [&tup, &Ixs] {
       ++std::get<Ixs>(tup);
       return 0;
@@ -101,7 +136,7 @@ where(const P& pred,
   static_assert(sizeof...(Ts) == sizeof...(Us),
                 "Tuples must be the same "
                 "size!");
-  return apply<sizeof...(Ts)>([&](auto... Ixs) {
+  return index_apply<sizeof...(Ts)>([&](auto... Ixs) {
     const auto ilist = std::initializer_list<bool>{ [&] {
       return pred(std::get<Ixs>(tup1), std::get<Ixs>(tup2));
     }()... };
