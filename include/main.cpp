@@ -7,6 +7,7 @@
 #include "tupletools.hpp"
 #include "utils.cpp"
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <fstream>
@@ -209,7 +210,6 @@ mate_critters(std::vector<erate_t>& data,
     for (int j = 0; j < mutation_count; j++) {
       int r = rng.randrange(0, N);
       std::get<0>(child.genes()[r]) ^= 1;
-      //   std::get<1>(child.genes()[r]) = rng.randrange(0, bucket_count);
     }
     children.push_back(child);
   }
@@ -305,7 +305,7 @@ optimize_buckets(std::vector<erate_t> data,
           mutation_gap = i;
 
           std::cout << header << std::endl;
-          ofs << "lea-number,discount,cost,do-mutate,bucket\n";
+          ofs << "lea-number,discount,cost,no-mutate,bucket\n";
 
           fmt::memory_buffer row;
           for (int k = 0; k < N; k++) {
@@ -389,7 +389,7 @@ main(int argc, char** argv)
     cxxopts::value<int>()->default_value("1000000"))(
     "rng_state",
     "Random number generator state",
-    cxxopts::value<uint64_t>()->default_value("0xDEADBEEF"));
+    cxxopts::value<int>()->default_value("-1"));
 
   auto result = options.parse(argc, argv);
 
@@ -406,7 +406,7 @@ CSV parsing of in_file.
                  "lea-number",
                  "discount",
                  "cost",
-                 "do-mutate",
+                 "no-mutate",
                  "bucket");
 
   while (in.read_row(lea_number, discount, cost, no_mutate, bucket)) {
@@ -417,6 +417,12 @@ CSV parsing of in_file.
   /*
   Optimizing function of erate_data.
    */
+  auto ts = std::chrono::duration_cast<std::chrono::microseconds>(
+    std::chrono::system_clock::now().time_since_epoch());
+
+  int _rng_state = result["rng_state"].as<int>();
+  uint64_t rng_state =
+    _rng_state > 0 ? static_cast<uint64_t>(_rng_state) : ts.count();
 
   optimize_buckets(erate_data,
                    result["out_file"].as<std::string>(),
@@ -429,5 +435,5 @@ CSV parsing of in_file.
                    result["parent_count"].as<int>(),
                    result["mating_pool_count"].as<int>(),
                    result["iterations"].as<int>(),
-                   result["rng_state"].as<uint64_t>());
+                   rng_state);
 }
