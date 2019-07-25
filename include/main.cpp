@@ -331,7 +331,7 @@ optimize_buckets(std::vector<erate_t>& data,
                  mutation_threshold_high);
       fmt::print("iteration: {0}, iteration-delta: {1}\n", i, i - mutation_gap);
       for (auto& critter : critters) {
-        fmt::print("critter fitness: {0}, max-ratio: {1}\n",
+        fmt::print("critter fitness: {0:.2f}, max-ratio: {1}\n",
                    critter.fitness(),
                    critter.fitness() / max_fitness);
       };
