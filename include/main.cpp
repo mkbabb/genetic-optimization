@@ -414,24 +414,6 @@ CSV parsing of in_file.
       erate_t{ lea_number, discount, cost, no_mutate, bucket });
   }
 
-<<<<<<< HEAD
-  int bucket_count = 4;
-  int pop_count = 100;
-  int max_bucket = 150;
-  int mut_rate = 1;
-  int parent_count = 9;
-  int iterations = 10'000'000;
-  int mut_threshold = 1'000;
-
-  optimize_buckets(erate_data,
-                   bucket_count,
-                   pop_count,
-                   mut_rate,
-                   parent_count,
-                   iterations,
-                   mut_threshold,
-                   max_bucket);
-=======
   /*
   Optimizing function of erate_data.
    */
@@ -454,5 +436,4 @@ CSV parsing of in_file.
                    result["mating_pool_count"].as<int>(),
                    result["iterations"].as<int>(),
                    rng_state);
->>>>>>> test-args
 }
