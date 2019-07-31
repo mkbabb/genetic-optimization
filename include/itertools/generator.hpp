@@ -1,9 +1,15 @@
+#ifndef GENERATOR_H
+#define GENERATOR_H
+
 #include <exception>
 #include <experimental/coroutine>
-#include <iostream>
 #include <iterator>
 #include <type_traits>
 #include <utility>
+
+#pragma once
+
+namespace itertools {
 
 template<typename T>
 class generator;
@@ -49,9 +55,9 @@ public:
 
   generator_promise() noexcept
     : _value(nullptr)
-    , _exception(nullptr)
     , _parent(this)
-    , _child(this){};
+    , _child(this)
+    , _exception(nullptr){};
 
   auto get_return_object() noexcept { return generator<T>{*this}; }
 
@@ -159,14 +165,14 @@ public:
     : _promise(promise)
   {}
 
-  bool operator==(const generator_iterator& other) const noexcept
+  bool operator==(const generator_iterator& rhs) const noexcept
   {
-    return _promise == other._promise;
+    return _promise == rhs._promise;
   }
 
-  bool operator!=(const generator_iterator& other) const noexcept
+  bool operator!=(const generator_iterator& rhs) const noexcept
   {
-    return _promise != other._promise;
+    return _promise != rhs._promise;
   }
 
   generator_iterator* operator++()
@@ -210,26 +216,26 @@ public:
   generator(promise_type& promise) noexcept
     : _promise(&promise)
   {}
-  generator(generator&& other) noexcept
+  generator(generator&& generator) noexcept
   {
-    _promise = other._promise;
-    other._promise = nullptr;
+    _promise = generator._promise;
+    generator._promise = nullptr;
   }
-  generator(const generator& other) = delete;
+  generator(const generator& generator) = delete;
 
   ~generator()
   {
     if (_promise) { _promise->destroy(); }
   }
 
-  generator& operator=(const generator& other) = delete;
+  generator& operator=(const generator& rhs) = delete;
 
-  generator& operator=(generator&& other) noexcept
+  generator& operator=(generator&& rhs) noexcept
   {
-    if (this != &other) {
+    if (this != &rhs) {
       if (_promise) { _promise->destroy(); }
-      _promise = other._promise;
-      other._promise = nullptr;
+      _promise = rhs._promise;
+      rhs._promise = nullptr;
     }
     return *this;
   }
@@ -257,3 +263,5 @@ private:
 
   promise_type* _promise;
 };
+};
+#endif // GENERATOR_H

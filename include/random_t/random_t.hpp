@@ -4,6 +4,7 @@
 #include "lcg.cpp"
 #include "mersenne_twister.cpp"
 #include "xor_shift.cpp"
+
 #include <cmath>
 #include <cstdint>
 #include <functional>
@@ -62,8 +63,7 @@ public:
     OutputType t = (-range) % range;
     while (true) {
       OutputType r = this->generate();
-      if (r >= t)
-        return r % range;
+      if (r >= t) return r % range;
     }
   };
 

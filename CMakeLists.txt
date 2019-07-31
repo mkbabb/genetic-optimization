@@ -15,7 +15,7 @@ set(COMPILE_FLAGS "-fcoroutines-ts -stdlib=libc++ -std=c++17")
 add_definitions(${COMPILE_FLAGS})
 # add_definitions(${LINK_FLAGS})
 
-add_executable(${PROJECT_NAME} include/tupletools/tests.cpp)
+add_executable(${PROJECT_NAME} include/itertools/tests.cpp)
 # target_link_libraries(${PROJECT_NAME} PRIVATE sqlite3)
 
 

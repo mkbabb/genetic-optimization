@@ -1,3 +1,5 @@
+#include "itertools/itertools.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -11,6 +13,7 @@
 
 constexpr uint32_t DB_32 = 0x4653ADF;
 constexpr uint64_t DB_64 = 0x07EDD5E59A4E28C2;
+
 constexpr uint32_t TAB_32[32] = {0,  1,  2,  6,  3,  11, 7,  16, 4,  14, 12,
                                  21, 8,  23, 17, 26, 31, 5,  10, 15, 13, 20,
                                  22, 25, 30, 9,  19, 24, 29, 18, 28, 27};
@@ -31,51 +34,6 @@ int
 ilog2(int x)
 {
   return TAB_64[((x & -x) * DB_64) >> 58];
-};
-
-template<typename Iter>
-std::string
-join(Iter begin, Iter end, std::string const& sep)
-{
-  std::ostringstream result;
-  if (begin != end) result << *begin++;
-  while (begin != end) result << sep << *begin++;
-  return result.str();
-}
-
-namespace ranges {
-template<typename Range, typename Function>
-Function
-for_each(Range& range, Function f)
-{
-  return std::for_each(begin(range), end(range), f);
-};
-
-template<typename Range>
-decltype(auto)
-join(Range& range, std::string const& sep)
-{
-  return ::join(begin(range), end(range), sep);
-}
-}
-
-template<typename Func>
-struct y_combinator
-{
-  Func func;
-  y_combinator(Func func)
-    : func(std::move(func))
-  {}
-  template<typename... Args>
-  decltype(auto) operator()(Args&&... args) const
-  {
-    return func(std::ref(*this), std::forward<Args>(args)...);
-  }
-  template<typename... Args>
-  decltype(auto) operator()(Args&&... args)
-  {
-    return func(std::ref(*this), std::forward<Args>(args)...);
-  }
 };
 
 // Python's implementation of __round__ and double_round
@@ -120,7 +78,7 @@ de_bruijn(int k, int n) -> std::string
   std::vector<int> a(k * n, 0);
   std::vector<int> seq;
 
-  auto db = y_combinator([&](auto self, int t, int p) -> void {
+  auto db = itertools::y_combinator([&](auto self, int t, int p) -> void {
     if (t > n) {
       if (!(n % p)) { seq.insert(end(seq), begin(a) + 1, begin(a) + p + 1); }
     } else {
@@ -133,7 +91,8 @@ de_bruijn(int k, int n) -> std::string
     }
   });
   db(1, 1);
-  return ranges::join(seq, "");
+  
+  return itertools::join(seq, "");
 }
 
 auto
