@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
+#include <iterator>
 #include <list>
 #include <numeric>
 #include <optional>
@@ -52,11 +53,6 @@ apply(Tuple t, F f)
     [&](auto... Is) { return f(std::get<Is>(t)...); });
 }
 
-struct nullptr_t
-{
-  int t = 0;
-};
-
 template<const std::size_t N, const std::size_t M, class... Ts, class Func>
 constexpr auto
 foreach_impl(std::tuple<Ts...>& tup, Func func)
@@ -91,7 +87,7 @@ template<class... Tuples>
 constexpr auto
 transpose(Tuples... tup)
 {
-  constexpr size_t len = std::min({ std::tuple_size<Tuples>{}... });
+  constexpr size_t len = std::min({std::tuple_size<Tuples>{}...});
   auto row = [&](auto Ix) { return std::make_tuple(std::get<Ix>(tup)...); };
   return index_apply<len>(
     [&](auto... Ixs) { return std::make_tuple(row(Ixs)...); });
@@ -120,10 +116,10 @@ constexpr auto
 increment_ref(std::tuple<Ts...>& tup)
 {
   return index_apply<sizeof...(Ts)>([&tup](auto... Ixs) {
-    (void)std::initializer_list<int>{ [&tup, &Ixs] {
+    (void) std::initializer_list<int>{[&tup, &Ixs] {
       ++std::get<Ixs>(tup);
       return 0;
-    }()... };
+    }()...};
   });
 }
 
@@ -137,9 +133,8 @@ where(const P& pred,
                 "Tuples must be the same "
                 "size!");
   return index_apply<sizeof...(Ts)>([&](auto... Ixs) {
-    const auto ilist = std::initializer_list<bool>{ [&] {
-      return pred(std::get<Ixs>(tup1), std::get<Ixs>(tup2));
-    }()... };
+    const auto ilist = std::initializer_list<bool>{
+      [&] { return pred(std::get<Ixs>(tup1), std::get<Ixs>(tup2)); }()...};
     return ilist;
   });
 }
@@ -177,9 +172,7 @@ constexpr bool
 any_of(std::initializer_list<T> ilist)
 {
   for (const auto& i : ilist) {
-    if (i) {
-      return true;
-    }
+    if (i) { return true; }
   };
   return false;
 }
@@ -189,9 +182,7 @@ constexpr bool
 all_of(std::initializer_list<T> ilist)
 {
   for (const auto& i : ilist) {
-    if (!i) {
-      return false;
-    }
+    if (!i) { return false; }
   };
   return true;
 }
@@ -202,13 +193,108 @@ disjunction_of(std::initializer_list<T> ilist)
 {
   bool prev = true;
   for (auto& i : ilist) {
-    if (!prev && i) {
-      return false;
-    };
+    if (!prev && i) { return false; };
     prev = i;
   };
   return true;
 }
+};
+
+namespace itertools {
+template<typename T>
+struct iterator_value
+{
+  using type = typename std::iterator_traits<
+    std::decay_t<decltype((std::declval<T&>().begin()))>>::value_type;
+};
+
+template<class... Ts>
+class zip;
+
+template<class... Ts>
+class zip_iterator
+{
+public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = std::tuple<typename iterator_value<Ts>::type...>;
+  using pointer_type = std::tuple<typename iterator_value<Ts>::type*...>;
+  using reference_type = std::tuple<typename iterator_value<Ts>::type&...>;
+
+  explicit zip_iterator(decltype(std::declval<Ts&>().begin())... seq) noexcept
+    : seq_(seq...)
+  {}
+
+  zip_iterator() = default;
+
+  zip_iterator& operator++()
+  {
+    tupletools::increment_ref(seq_);
+    return *this;
+  }
+
+  zip_iterator operator++(int)
+  {
+    auto tup = *this;
+    increment_ref(tup);
+    return tup;
+  }
+
+  bool operator==(const zip_iterator& rhs) noexcept
+  {
+    return !tupletools::any_of(
+      tupletools::where([](auto x, auto y) { return x != y; }, seq_, rhs.seq_));
+  }
+  bool operator!=(const zip_iterator& rhs) noexcept
+  {
+    return !tupletools::any_of(
+      tupletools::where([](auto x, auto y) { return x == y; }, seq_, rhs.seq_));
+  }
+
+  auto operator*() noexcept -> reference_type
+  {
+    return tupletools::deref(seq_);
+  }
+  auto operator*() const noexcept -> const value_type
+  {
+    return tupletools::deref(seq_);
+  }
+  auto operator-> () const noexcept -> pointer_type { return seq_; }
+
+private:
+  std::tuple<decltype(std::declval<Ts&>().begin())...> seq_;
+};
+
+template<class... Ts>
+class zip
+{
+public:
+  static_assert(sizeof...(Ts) > 0, "!");
+
+  using iterator = zip_iterator<Ts...>;
+
+  explicit zip(Ts&... seq)
+    : _begin(
+        std::forward<decltype(std::declval<Ts&>().begin())>(seq.begin())...)
+    , _end(std::forward<decltype(std::declval<Ts&>().begin())>(seq.end())...){};
+
+  zip(const zip& seq) = default;
+
+  zip& operator=(const zip& rhs) = default;
+
+  iterator begin() { return _begin; }
+  iterator end() { return _end; }
+
+  iterator begin() const { return _begin; }
+  iterator end() const { return _end; }
+
+  iterator cbegin() const { return _begin; }
+  iterator cend() const { return _end; }
+
+private:
+  friend class zip_iterator<Ts...>;
+  iterator _begin;
+  iterator _end;
+};
 
 template<class T>
 class range
@@ -221,8 +307,8 @@ public:
     using iterator_category = std::forward_iterator_tag;
     using value_type = T;
     using difference_type = T;
-    using pointer = T*;
-    using reference = T&;
+    using pointer_type = T*;
+    using reference_type = T&;
 
     explicit iterator(range<T>& seq)
       : seq_(seq)
@@ -316,82 +402,44 @@ protected:
   int size_;
 };
 
-template<class... Ts>
-class zip
-{
-  static_assert(sizeof...(Ts) > 0, "!");
-
-public:
-  class iterator
-  {
-  protected:
-    std::tuple<typename Ts::iterator...> seq_;
-
-  public:
-    using iterator_category = std::forward_iterator_tag;
-    using value_type = std::tuple<typename Ts::value_type...>;
-    using difference_type = std::tuple<typename Ts::value_type...>;
-    using pointer = std::tuple<typename Ts::value_type*...>;
-    using reference = std::tuple<typename Ts::value_type&...>;
-
-    explicit iterator(typename Ts::iterator... seq)
-      : seq_(seq...)
-    {}
-
-    iterator& operator++()
-    {
-      increment_ref(seq_);
-      return *this;
-    }
-
-    iterator operator++(int)
-    {
-      auto tup = *this;
-      increment_ref(tup);
-      return tup;
-    }
-
-    bool operator==(const iterator& rhs)
-    {
-      return !any_of(
-        where([](auto x, auto y) { return x != y; }, seq_, rhs.seq_));
-    }
-    bool operator!=(const iterator& rhs)
-    {
-      return !any_of(
-        where([](auto x, auto y) { return x == y; }, seq_, rhs.seq_));
-    }
-
-    auto operator*() -> iterator::reference { return deref(seq_); }
-    auto operator*() const -> const iterator::value_type { return deref(seq_); }
-  };
-
-  explicit zip(Ts&... seq)
-    : begin_(seq.begin()...)
-    , end_(seq.end()...){};
-
-  zip(const zip& seq) = default;
-
-  zip& operator=(const zip& rhs) = default;
-
-  zip<Ts...>::iterator begin() { return begin_; }
-  zip<Ts...>::iterator end() { return end_; }
-
-  zip<Ts...>::iterator begin() const { return begin_; }
-  zip<Ts...>::iterator end() const { return end_; }
-
-  zip<Ts...>::iterator cbegin() const { return begin_; }
-  zip<Ts...>::iterator cend() const { return end_; }
-
-  zip<Ts...>::iterator begin_;
-  zip<Ts...>::iterator end_;
-};
-
 template<class T>
-auto
+constexpr auto
 enumerate(T& iterable)
 {
   range range_(iterable.size());
   return zip(range_, iterable);
 }
-};
+
+template<class T>
+constexpr void
+swap(T& cont, int ix1, int ix2)
+{
+  auto t = cont[ix1];
+  cont[ix1] = cont[ix2];
+  cont[ix2] = t;
+}
+
+template<class InputCont, class UnaryFunction>
+constexpr InputCont
+for_each(InputCont& cont, UnaryFunction f)
+{
+  auto first = begin(cont);
+  auto last = end(cont);
+  for (int n = 0; first != last; ++first) { f(*first, n++); }
+  return cont;
+}
+
+template<class InputCont>
+constexpr void
+roll(InputCont cont, int axis)
+{
+  int ndim = cont.size();
+  if (axis == 0) {
+    return;
+  } else if (axis < 0) {
+    axis += ndim;
+  }
+  int i = 0;
+  while (i++ < axis) { swap(cont, axis, i); };
+}
+}

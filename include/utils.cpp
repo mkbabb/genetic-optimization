@@ -11,16 +11,15 @@
 
 constexpr uint32_t DB_32 = 0x4653ADF;
 constexpr uint64_t DB_64 = 0x07EDD5E59A4E28C2;
-constexpr uint32_t TAB_32[32] = { 0,  1,  2,  6,  3,  11, 7,  16, 4,  14, 12,
-                                  21, 8,  23, 17, 26, 31, 5,  10, 15, 13, 20,
-                                  22, 25, 30, 9,  19, 24, 29, 18, 28, 27 };
+constexpr uint32_t TAB_32[32] = {0,  1,  2,  6,  3,  11, 7,  16, 4,  14, 12,
+                                 21, 8,  23, 17, 26, 31, 5,  10, 15, 13, 20,
+                                 22, 25, 30, 9,  19, 24, 29, 18, 28, 27};
 
-constexpr uint64_t TAB_64[64] = { 63, 0,  58, 1,  59, 47, 53, 2,  60, 39, 48,
-                                  27, 54, 33, 42, 3,  61, 51, 37, 40, 49, 18,
-                                  28, 20, 55, 30, 34, 11, 43, 14, 22, 4,  62,
-                                  57, 46, 52, 38, 26, 32, 41, 50, 36, 17, 19,
-                                  29, 10, 13, 21, 56, 45, 25, 31, 35, 16, 9,
-                                  12, 44, 24, 15, 8,  23, 7,  6,  5 };
+constexpr uint64_t TAB_64[64] = {
+  63, 0,  58, 1,  59, 47, 53, 2,  60, 39, 48, 27, 54, 33, 42, 3,
+  61, 51, 37, 40, 49, 18, 28, 20, 55, 30, 34, 11, 43, 14, 22, 4,
+  62, 57, 46, 52, 38, 26, 32, 41, 50, 36, 17, 19, 29, 10, 13, 21,
+  56, 45, 25, 31, 35, 16, 9,  12, 44, 24, 15, 8,  23, 7,  6,  5};
 
 int
 ilog2(uint32_t x)
@@ -39,10 +38,8 @@ std::string
 join(Iter begin, Iter end, std::string const& sep)
 {
   std::ostringstream result;
-  if (begin != end)
-    result << *begin++;
-  while (begin != end)
-    result << sep << *begin++;
+  if (begin != end) result << *begin++;
+  while (begin != end) result << sep << *begin++;
   return result.str();
 }
 
@@ -91,16 +88,16 @@ double_round(T x, int ndigits = 0) -> double
     if (ndigits > 22) {
       /* pow1 and pow2 are each safe from overflow, but
          pow1*pow2 ~= pow(10.0, ndigits) might overflow */
-      pow1 = pow(10.0, (double)(ndigits - 22));
+      pow1 = pow(10.0, (double) (ndigits - 22));
       pow2 = 1e22;
     } else {
-      pow1 = pow(10.0, (double)ndigits);
+      pow1 = pow(10.0, (double) ndigits);
       pow2 = 1.0;
     }
     y = (x * pow1) * pow2;
     /* if y overflows, then rounded value is exactly x */
   } else {
-    pow1 = pow(10.0, (double)-ndigits);
+    pow1 = pow(10.0, (double) -ndigits);
     pow2 = 1.0; /* unused; silences a gcc compiler warning */
     y = x / pow1;
   }
@@ -125,9 +122,7 @@ de_bruijn(int k, int n) -> std::string
 
   auto db = y_combinator([&](auto self, int t, int p) -> void {
     if (t > n) {
-      if (!(n % p)) {
-        seq.insert(end(seq), begin(a) + 1, begin(a) + p + 1);
-      }
+      if (!(n % p)) { seq.insert(end(seq), begin(a) + 1, begin(a) + p + 1); }
     } else {
       a[t] = a[t - p];
       self(t + 1, p);

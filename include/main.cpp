@@ -4,7 +4,7 @@
 #include "cxxopts.hpp"
 #include "fmt/format.h"
 #include "random_t/random_t.hpp"
-#include "tupletools.hpp"
+#include "tupletools/tupletools.hpp"
 #include "utils.cpp"
 
 #include <algorithm>
@@ -13,12 +13,12 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
-#include <map>
 #include <optional>
 #include <random>
 #include <sstream>
 #include <tuple>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 constexpr int MAX_2015 = 11'810'384;
@@ -88,21 +88,6 @@ public:
 };
 
 auto
-parent_distb(int N) -> std::vector<int>
-{
-
-  int slice = ceil(100.0 / N);
-  if (N * slice > 100) {
-    std::vector<int> t(N, slice);
-    t[N - 1] = (100 - slice * (N - 1));
-    return t;
-  } else {
-    std::vector<int> t(N, slice);
-    return t;
-  }
-}
-
-auto
 make_genes(std::vector<erate_t>& data, int bucket_count)
   -> std::vector<std::tuple<int, int>>
 {
@@ -122,82 +107,138 @@ make_genes(std::vector<erate_t>& data, int bucket_count)
 }
 
 template<typename T>
-void
-calc_erate_stats(std::vector<erate_t>& data,
-                 std::map<int, std::map<std::string, double>>& buckets,
-                 Critter& critter,
-                 int max_bucket,
-                 T& rng)
+Critter&
+calc_pool_fitness(std::vector<erate_t>& data,
+                  std::map<int, std::map<std::string, double>>& buckets,
+                  std::vector<Critter>& critters,
+                  Critter& max_critter,
+                  int max_bucket,
+                  T& rng)
+
 {
-  for (int i = 0; i < data.size(); i++) {
-    int j = std::get<0>(critter.genes()[i]) ? std::get<1>(critter.genes()[i])
-                                            : rng.randrange(0, buckets.size());
-    while (buckets[j]["count"] >= max_bucket) {
-      j = rng.randrange(0, buckets.size());
+  for (auto& critter : critters) {
+    if (!critter.skip()) {
+      for (int i = 0; i < data.size(); i++) {
+        int j = std::get<0>(critter.genes()[i])
+                  ? std::get<1>(critter.genes()[i])
+                  : rng.randrange(0, buckets.size());
+
+        while (buckets[j]["count"] >= max_bucket) {
+          j = rng.randrange(0, buckets.size());
+        }
+        auto& bucket = buckets[j];
+
+        bucket["total_cost"] += data[i].cost;
+        bucket["total_discount"] += data[i].discount;
+        bucket["count"]++;
+
+        std::get<1>(critter.genes()[i]) = j;
+      }
+
+      double fitness = 0;
+      for (auto& [_, bucket] : buckets) {
+        if (bucket["count"] > 0) {
+          bucket["average_discount"] = double_round(
+            (bucket["total_discount"] / (bucket["count"] * 100)), 3);
+          bucket["discount_cost"] =
+            bucket["average_discount"] * bucket["total_cost"];
+          fitness += bucket["discount_cost"];
+        }
+        for (auto& [key, value] : bucket) { value = 0; }
+      }
+      critter.fitness(fitness);
+      critter.skip(true);
     }
-    auto& bucket = buckets[j];
-
-    bucket["total_cost"] += data[i].cost;
-    bucket["total_discount"] += data[i].discount;
-    bucket["count"]++;
-
-    std::get<1>(critter.genes()[i]) = j;
+    if (critter.fitness() > max_critter.fitness()) { max_critter = critter; }
   }
-
-  double fitness = 0;
-  for (auto& [_, bucket] : buckets) {
-    if (bucket["count"] > 0) {
-      bucket["average_discount"] =
-        double_round((bucket["total_discount"] / (bucket["count"] * 100)), 3);
-      bucket["discount_cost"] =
-        bucket["average_discount"] * bucket["total_cost"];
-      fitness += bucket["discount_cost"];
-    }
-    for (auto& [key, value] : bucket) { value = 0; }
-  }
-  critter.fitness(fitness);
-  //   critter.skip(true);
+  return max_critter;
 }
 
 template<typename T>
-Critter
-mate_critters(std::vector<Critter>& parents,
-              std::vector<int>& pdistb,
-              int N,
-              T& rng)
+auto
+proportionate_selection(std::vector<Critter>& critters,
+                        int max_fitness,
+                        int mating_pool_count,
+                        T& rng) -> std::vector<Critter>
 {
-  Critter child(N);
+  int divisor = critters.size() * 100;
+  std::map<int, int> pdict;
+  std::vector<Critter> parents;
+  parents.reserve(mating_pool_count);
 
-  std::sort(begin(parents), end(parents), [](auto c1, auto c2) {
-    return c1.fitness() > c2.fitness();
-  });
+  double total_fitness = 0;
+  for (auto& critter : critters) {
+    critter.fitness((critter.fitness() / max_fitness - 0.9) * 10);
+    total_fitness += critter.fitness();
+  }
 
-  int p = 0;
-  for (int i = 0; i < child.genes().size(); i++) {
-    int r = rng.randrange(0, 100);
-    int start = 0;
+  double p = 0;
+  double prev_p = 0;
+  for (auto [n, critter] : tupletools::enumerate(critters)) {
+    p = prev_p + critter.fitness() / total_fitness;
+    pdict[n] = static_cast<int>(p * divisor);
+    prev_p = p;
+  }
 
-    for (int j = 0; j < pdistb.size(); j++) {
-      if (start < r && r < (start + pdistb[j])) {
-        p = j;
+  for (int i = 0; i < mating_pool_count; i++) {
+    int r = rng.randrange(0, divisor);
+    for (auto& [key, value] : pdict) {
+      if (r < value) {
+        parents.push_back(critters[value]);
         break;
-      } else {
-        start += pdistb[j];
       }
     }
-    std::get<0>(child.genes()[i]) = std::get<0>(parents[p].genes()[i]);
-    std::get<1>(child.genes()[i]) = std::get<1>(parents[p].genes()[i]);
   }
-  return child;
+  return parents;
+}
+
+template<typename T>
+auto
+k_point_crossover(std::vector<Critter>& parents,
+                  std::vector<int>& pdistb,
+                  int N,
+                  int mating_pool_count,
+                  T& rng) -> std::vector<Critter>
+{
+  std::vector<Critter> children(parents.size(), {N});
+  std::vector<int> ixs(parents.size(), 0);
+  tupletools::for_each(ixs, [](auto v, int n) { return n; });
+
+  for (int i = 0; i < mating_pool_count; i++) {
+    int crossover_point = rng.randrange(0, N);
+    pdistb[i] = crossover_point;
+  }
+  std::sort(begin(pdistb), end(pdistb));
+
+  int start = 0;
+  int end = 0;
+  int i = 0;
+  do {
+    if (i++ == parents.size()) {
+      end = N - 1;
+    } else {
+      end = pdistb[i];
+    }
+    for (auto [child, parent] : tupletools::zip(children, parents)) {
+      do {
+        for (auto [n, j] : tupletools::enumerate(ixs)) {
+          std::get<0>(child.genes()[j]) = std::get<0>(parent.genes()[j]);
+          std::get<1>(child.genes()[j]) = std::get<1>(parent.genes()[j]);
+        }
+        tupletools::roll(ixs, 1);
+      } while (start++ < end);
+    }
+    start = pdistb[i];
+  } while (end != N - 1);
+  return children;
 }
 
 template<typename T>
 void
 cull_mating_pool(std::vector<erate_t>& data,
-                 std::vector<int>& pdistb,
                  std::vector<Critter>& critters,
                  int bucket_count,
-                 int max_fitness,
+                 double max_fitness,
                  int mutation_count,
                  int mating_pool_count,
                  int top_pool,
@@ -206,28 +247,16 @@ cull_mating_pool(std::vector<erate_t>& data,
   int N = data.size();
   int M = critters.size();
 
-  std::sort(begin(critters), end(critters), [](auto c1, auto c2) {
-    return c1.fitness() > c2.fitness();
-  });
-
-  std::vector<Critter> children(begin(critters), begin(critters) + top_pool);
-  std::vector<Critter> parents(begin(critters),
-                               begin(critters) + mating_pool_count);
-  children.reserve(N);
+  auto parents =
+    proportionate_selection(critters, max_fitness, mating_pool_count, rng);
+  std::vector<Critter> children;
+  children.reserve(2 * N);
+  std::vector<int> pdistb(mating_pool_count, 0);
 
   for (int i = 0; i < M - top_pool; i++) {
-    for (int j = 0; j < mating_pool_count; j++) {
-      int r = rng.randrange(0, M);
-      parents[j] = critters[r];
-    }
-
-    Critter child = mate_critters(parents, pdistb, N, rng);
-
-    for (int j = 0; j < mutation_count; j++) {
-      int r = rng.randrange(0, N);
-      std::get<0>(child.genes()[r]) ^= 1;
-    }
-    children.push_back(child);
+    auto t_children =
+      k_point_crossover(parents, pdistb, N, mating_pool_count, rng);
+    children.insert(end(children), begin(t_children), end(t_children));
   }
   critters = std::move(children);
 }
@@ -257,8 +286,6 @@ optimize_buckets(std::vector<erate_t>& data,
     static_cast<int>(1.0f * mutation_threshold_high / mutation_threshold_low),
     1);
   max_bucket = max_bucket > N ? N : max_bucket;
-
-  std::vector<int> pdistb = parent_distb(parent_count);
   std::map<int, std::map<std::string, double>> buckets;
 
   random_t::Random rng(rng_state, random_t::lcg_xor_rot);
@@ -273,83 +300,60 @@ optimize_buckets(std::vector<erate_t>& data,
   }
   std::vector<Critter> critters(population_count,
                                 {N, make_genes(data, bucket_count)});
+  Critter max_critter = critters[0];
 
   int mutation_counter_low = 0;
   int mutation_counter_high = 0;
   int mutation_gap = 0;
-  int t_mutation_count = mutation_count;
 
   for (int i = 0; i < iterations; i++) {
-    for (auto& critter : critters) {
-      if (!critter.skip()) {
-        calc_erate_stats(data, buckets, critter, max_bucket, rng);
+    auto critter =
+      calc_pool_fitness(data, buckets, critters, max_critter, max_bucket, rng);
 
-        if (critter.fitness() > max_fitness) {
-          ofs.open(out_file, std::ios::trunc);
-
-          std::string header =
-            fmt::format("\niteration: {0}, discount-total: {1:.2f}\n"
-                        "max-delta: {2:.2f}, prev-max-delta: {3:.2f}\n"
-                        "iteration-delta: {4}, rng-state: {5}",
-                        i,
-                        critter.fitness(),
-                        critter.fitness() - MAX_2019,
-                        critter.fitness() - max_fitness,
-                        i - mutation_gap,
-                        rng.state());
-
-          max_fitness = critter.fitness();
-          mutation_counter_low = i;
-          mutation_counter_high = 0;
-          mutation_gap = i;
-
-          fmt::print("{0}\n", header);
-          ofs << "lea-number,discount,cost,no-mutate,bucket\n";
-
-          fmt::memory_buffer row;
-          for (int k = 0; k < N; k++) {
-            fmt::format_to(row,
-                           "{0},{1},{2},{3},{4}\n",
-                           data[k].lea_number,
-                           data[k].discount,
-                           data[k].cost,
-                           std::get<0>(critter.genes()[k]),
-                           std::get<1>(critter.genes()[k]));
-            std::get<0>(critter.genes()[k]) = 1;
-          }
-          ofs << row.data();
-          ofs.close();
-        }
-      }
-    }
-    if ((i - mutation_counter_low) >= mutation_threshold_low) {
+    if (critter.fitness() > max_critter.fitness()) {
+      std::ofstream ofs;
+      ofs.open(out_file, std::ios::trunc);
+      std::string header =
+        fmt::format("\niteration: {0}, discount-total: {1:.2f}\n"
+                    "max-delta: {2:.2f}, prev-max-delta: {3:.2f}\n"
+                    "iteration-delta: {4}, rng-state: {5}",
+                    i,
+                    critter.fitness(),
+                    critter.fitness() - MAX_2019,
+                    critter.fitness() - max_critter.fitness(),
+                    i - mutation_gap,
+                    rng.state());
+      max_critter = critter;
       mutation_counter_low = i;
-      mutation_counter_high += 1;
-      t_mutation_count = static_cast<float>(N * 3) / 100;
-      fmt::print("\n***Low threshold met! Mutating by 3%... {0}/{1}***\n",
-                 mutation_counter_high,
-                 mutation_threshold_high);
-      fmt::print("iteration: {0}, iteration-delta: {1}\n", i, i - mutation_gap);
-      for (auto& critter : critters) {
-        fmt::print("critter fitness: {0:.2f}, max-ratio: {1}\n",
-                   critter.fitness(),
-                   critter.fitness() / max_fitness);
-      };
-    } else if (mutation_counter_high >= mutation_threshold_high) {
       mutation_counter_high = 0;
-      t_mutation_count = static_cast<float>(N * 9) / 100;
-      fmt::print("\n***High threshold met! Mutating by 9%...***\n");
+      mutation_gap = i;
+
+      fmt::print("{0}\n", header);
+      ofs << "lea-number,discount,cost,no-mutate,bucket\n";
+
+      fmt::memory_buffer row;
+      for (int k = 0; k < N; k++) {
+        fmt::format_to(row,
+                       "{0},{1},{2},{3},{4}\n",
+                       data[k].lea_number,
+                       data[k].discount,
+                       data[k].cost,
+                       std::get<0>(critter.genes()[k]),
+                       std::get<1>(critter.genes()[k]));
+        std::get<0>(critter.genes()[k]) = 1;
+      }
+      ofs << row.data();
+      ofs.close();
     }
+
     cull_mating_pool(data,
-                     pdistb,
                      critters,
                      bucket_count,
                      max_fitness,
-                     t_mutation_count,
+                     mutation_count,
                      mating_pool_count,
                      top_pool,
                      rng);
-    t_mutation_count = mutation_count;
   }
 }
 
