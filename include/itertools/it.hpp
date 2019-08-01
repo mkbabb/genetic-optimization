@@ -1,11 +1,12 @@
 #ifndef ITERTOOLS_H
 #define ITERTOOLS_H
 
-#include "generator.hpp"
+// #include "generator.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <iostream>
 #include <iterator>
 #include <list>
 #include <numeric>
@@ -110,7 +111,7 @@ struct iterator_value
 };
 
 template<class... Args>
-constexpr auto
+constexpr decltype(auto)
 deref(std::tuple<Args...>& tup)
 {
   return index_apply<sizeof...(Args)>(
@@ -232,183 +233,72 @@ struct iterator_value
     std::decay_t<decltype((std::declval<T&>().begin()))>>::value_type;
 };
 
-template<class... Args>
-class zip;
+// template<class... Args>
+// class zip_iterator
+// {
+// public:
+//   using iterator_category = std::forward_iterator_tag;
+//   using value_type = std::tuple<typename iterator_value<Args>::type...>;
+//   using pointer_type = std::tuple<typename iterator_value<Args>::type*...>*;
+//   using reference_type = std::tuple<typename
+//   iterator_value<Args&>::type&...>&;
 
-template<class... Args>
-class zip_iterator
+//   explicit zip_iterator(
+//     decltype(std::declval<Args&>().begin())... args) noexcept
+//     : _args(args...)
+//   {}
+
+//   //   zip_iterator() noexcept = default;
+
+//   zip_iterator& operator++()
+//   {
+//     tupletools::increment_ref(_args);
+//     return *this;
+//   }
+
+//   zip_iterator operator++(int)
+//   {
+//     auto tup = *this;
+//     increment_ref(tup);
+//     return tup;
+//   }
+
+//   bool operator==(const zip_iterator& rhs) noexcept
+//   {
+//     return !tupletools::any_of(tupletools::where(
+//       [](auto x, auto y) { return x != y; }, _args, rhs._args));
+//   }
+//   bool operator!=(const zip_iterator& rhs) noexcept
+//   {
+//     return !tupletools::any_of(tupletools::where(
+//       [](auto x, auto y) { return x == y; }, _args, rhs._args));
+//   }
+
+//   //   reference_type operator*() noexcept { return tupletools::deref(_args);
+//   }
+//   //   auto& operator*() noexcept { return tupletools::deref(&_args); }
+//   auto operator*() noexcept { return tupletools::deref(_args); }
+//   auto operator-> () const noexcept -> pointer_type { return _args; }
+
+// private:
+//   std::tuple<decltype(std::declval<Args&>().begin())...> _args;
+// };
+
+template<class... T>
+struct zip
 {
 public:
-  using iterator_category = std::forward_iterator_tag;
-  using value_type = std::tuple<typename iterator_value<Args>::type...>;
-  using pointer_type = std::tuple<typename iterator_value<Args>::type*...>*;
-  using reference_type = std::tuple<typename iterator_value<Args&>::type&...>&;
+  static constexpr std::size_t N = sizeof...(T);
 
-  explicit zip_iterator(
-    decltype(std::declval<Args&>().begin())... args) noexcept
-    : _args(args...)
-  {}
-
-  zip_iterator() noexcept = default;
-
-  zip_iterator& operator++()
+  
+  zip(const T&... args)
+    : tup{args...}
   {
-    tupletools::increment_ref(_args);
-    return *this;
+      
   }
 
-  zip_iterator operator++(int)
-  {
-    auto tup = *this;
-    increment_ref(tup);
-    return tup;
-  }
-
-  bool operator==(const zip_iterator& rhs) noexcept
-  {
-    return !tupletools::any_of(tupletools::where(
-      [](auto x, auto y) { return x != y; }, _args, rhs._args));
-  }
-  bool operator!=(const zip_iterator& rhs) noexcept
-  {
-    return !tupletools::any_of(tupletools::where(
-      [](auto x, auto y) { return x == y; }, _args, rhs._args));
-  }
-
-  //   reference_type operator*() noexcept { return tupletools::deref(_args); }
-  //   auto& operator*() noexcept { return tupletools::deref(&_args); }
-  auto operator*() noexcept { return tupletools::deref(_args); }
-  auto operator-> () const noexcept -> pointer_type { return _args; }
-
-private:
-  std::tuple<decltype(std::declval<Args&>().begin())...> _args;
+  std::tuple<T...> tup;
 };
 
-template<class... Args>
-class zip
-{
-public:
-  static constexpr std::size_t N = sizeof...(Args);
-  using iterator = zip_iterator<const Args...>;
-  //   static_assert(sizeof...(Args) > 0, "!");
-
-  //   template<typename... Ts>
-  //   zip(Ts&&... args)
-  //     : _begin(
-  //         std::forward<decltype(std::declval<Ts&>().begin())>(args.begin())...)
-  //     , _end(
-  //         std::forward<decltype(std::declval<Ts&>().begin())>(args.end())...){};
-  //   zip(const Args&... args)
-  //     : _begin{std::forward<decltype(std::declval<Args&>().begin())>(
-  //         args.begin())...}
-  //     , _end{std::forward<decltype(std::declval<Args&>().begin())>(
-  //         args.end())...} {};
-
-  zip(const Args&... args)
-    : _begin(args.begin()...)
-    , _end(args.end()...){};
-
-  zip& operator=(const zip& rhs) = default;
-
-  iterator begin() { return _begin; }
-  iterator end() { return _end; }
-
-  iterator begin() const { return _begin; }
-  iterator end() const { return _end; }
-
-  iterator cbegin() const { return _begin; }
-  iterator cend() const { return _end; }
-
-private:
-  iterator _begin;
-  iterator _end;
-};
-
-template<typename T>
-generator<T>
-range(T start, T stop, T stride = 1)
-{
-  stride = start > stop ? -1 : 1;
-  do {
-    co_yield start;
-    start += stride;
-  } while (start < stop);
-}
-
-template<typename T>
-generator<T>
-range(T stop)
-{
-  T start = 0;
-  if (start > stop) { std::swap(start, stop); }
-  return range<T>(start, stop, 1);
-}
-
-template<class Iter>
-constexpr auto
-enumerate(Iter& iter)
-{
-  auto _range = range(iter.size());
-  return zip(_range, iter);
-}
-
-template<class Iter>
-constexpr void
-swap(Iter& iter, int ix1, int ix2)
-{
-  auto t = iter[ix1];
-  iter[ix1] = iter[ix2];
-  iter[ix2] = t;
-}
-
-template<class Iter, class UnaryFunction>
-constexpr Iter
-for_each(Iter& iter, UnaryFunction f)
-{
-  for (auto [n, i] : enumerate(iter)) { f(n, i); }
-  return iter;
-}
-
-template<class Iter>
-constexpr void
-roll(Iter& iter, int axis)
-{
-  int ndim = iter.size();
-  if (axis == 0) {
-    return;
-  } else if (axis < 0) {
-    axis += ndim;
-  }
-  int i = 0;
-  while (i++ < axis) { swap(iter, axis, i); };
-}
-
-template<typename Iter>
-std::string
-join(Iter& iter, std::string const&& sep)
-{
-  std::ostringstream result;
-  for (auto [n, i] : enumerate(iter)) { result << (n > 0 ? sep : "") << i; }
-  return result.str();
-}
-
-template<typename Func>
-struct y_combinator
-{
-  Func func;
-  y_combinator(Func func)
-    : func(std::move(func))
-  {}
-  template<typename... Args>
-  auto operator()(Args&&... args) const
-  {
-    return func(std::ref(*this), std::forward<Args>(args)...);
-  }
-  template<typename... Args>
-  auto operator()(Args&&... args)
-  {
-    return func(std::ref(*this), std::forward<Args>(args)...);
-  }
-};
 };
 #endif // ITERTOOLS_H

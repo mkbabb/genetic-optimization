@@ -39,7 +39,8 @@ ilog_tests()
   int tm = std::pow(2, m);
 
   std::string db = de_bruijn(2, m);
-  std::vector<int> tb = tabn(tm, std::stoi(db, nullptr, 2));}
+  std::vector<int> tb = tabn(tm, std::stoi(db, nullptr, 2));
+}
 
 int
 main()

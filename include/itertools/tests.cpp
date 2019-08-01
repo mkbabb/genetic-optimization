@@ -60,7 +60,8 @@ tupletools_zip_tests()
   std::vector<int> iv5 = {9, 8, 7, 6, 5, 4, 3, 2};
   std::vector<int> iv6 = {123, 1234, 12345};
 
-  //   std::cout << "\nAutomatically adjusts and shrinks the iterator to the "
+  // std::cout << "\nAutomatically adjusts and shrinks the iterator to the
+  //   "
   //                "smallest of the zipped iterator sizes!\n"
   //             << std::endl;
 
@@ -72,7 +73,8 @@ tupletools_zip_tests()
   auto tup2 = std::make_tuple(33.1414, 1UL, 2, 22, 1.1, 3.141);
 
   //   std::cout << "We can print an entire tuple in one go, too:\n" <<
-  //   std::endl; std::cout << tupletools::to_string(tup1) << "\n" << std::endl;
+  //   std::endl; std::cout << tupletools::to_string(tup1) << "\n" <<
+  //   std::endl;
   //   std::cout << tupletools::to_string(tup2) << "\n" << std::endl;
 }
 
@@ -174,10 +176,30 @@ rec(int n)
 int
 main()
 {
+
   any_tests();
   tupletools_zip_tests();
-  enumerate_tests();
-  range_tests();
+//   enumerate_tests();
+//   range_tests();
+
+  std::vector<int> v1(10, 10);
+
+  for (auto [i, j] : itertools::zip(v1, std::vector<int>{1, 2, 3, 4})) {}
+
+  //   for (auto [n, i] : itertools::enumerate(v1)) { fmt::print("{}, {}\n", n,
+  //   i); }
+
+  // //   for (auto& [n, i] : itertools::enumerate(v1)) {
+  // //     fmt::print("{}, {}\n", n, i);
+  // //     i += 1;
+  // //   }
+  //   for (const auto& [n, i] : itertools::enumerate(v1)) {
+  //     fmt::print("{}, {}\n", n, i);
+  //     // i += 1;
+  //   }
+
+  //   for (auto [n, i] : itertools::enumerate(v1)) { fmt::print("{}, {}\n", n,
+  //   i); }
 
   return 0;
 }

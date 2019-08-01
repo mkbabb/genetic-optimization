@@ -144,12 +144,16 @@ calc_pool_fitness(std::vector<erate_t>& data,
             bucket["average_discount"] * bucket["total_cost"];
           fitness += bucket["discount_cost"];
         }
-        for (auto& [key, value] : bucket) { value = 0; }
       }
       critter.fitness(fitness);
       critter.skip(true);
+
+      if (critter.fitness() > max_critter.fitness()) { max_critter = critter; }
+      
+      for (auto& [_, bucket] : buckets) {
+        for (auto& [key, value] : bucket) { value = 0; }
+      }
     }
-    if (critter.fitness() > max_critter.fitness()) { max_critter = critter; }
   }
   return max_critter;
 }

@@ -4,7 +4,7 @@ project(erate VERSION 0.1.0)
 
 set(CMAKE_CXX_COMPILER "/usr/local/Cellar/llvm/8.0.0_1/bin/clang++")
 
-set(COMPILE_FLAGS "-fcoroutines-ts -stdlib=libc++ -std=c++17")
+set(COMPILE_FLAGS "-fcoroutines-ts -stdlib=libc++ -std=c++2a")
 # set(LINK_FLAGS "${LINK_FLAGS} -stdlib=libc++")
 
 # include_directories(/usr/local/Cellar/llvm/8.0.0_1/include/c++/v1)
