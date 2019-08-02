@@ -179,27 +179,22 @@ main()
 
   any_tests();
   tupletools_zip_tests();
-//   enumerate_tests();
-//   range_tests();
+  // enumerate_tests();
+  //   range_tests();
 
   std::vector<int> v1(10, 10);
 
-  for (auto [i, j] : itertools::zip(v1, std::vector<int>{1, 2, 3, 4})) {}
+  for (auto [i, j] : itertools::zip(v1, std::vector<int>{1, 2, 3, 4})) {
+    tupletools::const_downcast(i) = 99;
+  }
 
+  for (auto [n, i] : itertools::enumerate(v1)) { fmt::print("{}, {}\n", n, i); }
+  fmt::print("yon1\n");
+  for (auto [n, i] : itertools::enumerate(v1)) { fmt::print("{}, {}\n", n, i); }
+  //   fmt::print("yon2\n");
   //   for (auto [n, i] : itertools::enumerate(v1)) { fmt::print("{}, {}\n", n,
-  //   i); }
-
-  // //   for (auto& [n, i] : itertools::enumerate(v1)) {
-  // //     fmt::print("{}, {}\n", n, i);
-  // //     i += 1;
-  // //   }
-  //   for (const auto& [n, i] : itertools::enumerate(v1)) {
-  //     fmt::print("{}, {}\n", n, i);
-  //     // i += 1;
-  //   }
-
-  //   for (auto [n, i] : itertools::enumerate(v1)) { fmt::print("{}, {}\n", n,
-  //   i); }
+  //   i); } fmt::print("yon3\n"); for (auto [n, i] : itertools::enumerate(v1))
+  //   { fmt::print("{}, {}\n", n, i); }
 
   return 0;
 }

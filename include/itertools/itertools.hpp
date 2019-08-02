@@ -21,6 +21,54 @@
 
 namespace tupletools {
 
+/*
+Template-type meta-programming.
+Used for either getting or setting types withal.
+ */
+
+template<typename T>
+struct remove_const_ref
+{
+  using type = typename std::add_lvalue_reference_t<
+    std::remove_const_t<std::remove_reference_t<T>>>;
+};
+
+template<typename T>
+struct add_const_ref
+{
+  using type = typename std::add_lvalue_reference_t<
+    std::add_const_t<std::remove_reference_t<T>>>;
+};
+
+template<typename T>
+constexpr auto&&
+const_downcast(T&& value)
+{
+  using downcasted = typename remove_const_ref<T>::type;
+  return std::forward<downcasted>(const_cast<downcasted>(value));
+}
+
+template<typename T>
+constexpr auto&&
+const_upcast(T&& value)
+{
+  using upcasted = typename add_const_ref<T>::type;
+  return std::forward<upcasted>(const_cast<upcasted>(value));
+}
+
+template<typename T>
+struct container_iterator_value
+{
+  using type = typename std::iterator_traits<
+    std::decay_t<decltype(std::declval<T&>().begin())>>::value_type;
+};
+
+template<typename T>
+struct container_iterator_type
+{
+  using type = decltype(std::declval<T>().begin());
+};
+
 template<std::size_t... Ns>
 struct index_sequence
 {};
@@ -39,6 +87,8 @@ make_index_sequence_impl()
 template<std::size_t N>
 using make_index_sequence =
   std::decay_t<decltype(make_index_sequence_impl<N>())>;
+
+// template-type meta-programming.
 
 template<std::size_t... Ix, class F>
 constexpr auto
@@ -102,38 +152,34 @@ transpose(Tuples... tup)
     [&](auto... Ixs) { return std::make_tuple(row(Ixs)...); });
 }
 
-template<typename T>
-struct iterator_value
+template<class... Args>
+constexpr auto
+deref_fwd_const(std::tuple<Args...>& tup)
 {
-  using type = typename std::iterator_traits<
-    std::decay_t<decltype((std::declval<T&>().begin()))>>::value_type;
-};
+  return index_apply<sizeof...(Args)>([&tup](auto... Ixs) {
+    return std::forward_as_tuple(*std::get<Ixs>(tup)...);
+  });
+}
 
 template<class... Args>
 constexpr auto
-deref(std::tuple<Args...>& tup)
+deref_fwd_volatile(std::tuple<Args...>& tup)
+{
+  return index_apply<sizeof...(Args)>([&tup](auto... Ixs) {
+    return std::forward_as_tuple(
+      const_cast<
+        typename remove_const_ref<decltype(*std::get<Ixs>(tup))>::type>(
+        *std::get<Ixs>(tup))...);
+  });
+}
+
+template<class... Args>
+constexpr auto
+deref_cpy(std::tuple<Args...>& tup)
 {
   return index_apply<sizeof...(Args)>(
     [&tup](auto... Ixs) { return std::make_tuple(*std::get<Ixs>(tup)...); });
 }
-
-// template<class... Args>
-// constexpr std::tuple<typename Args...>
-// deref(std::tuple<Args...>* tup)
-// {
-//   return index_apply<sizeof...(Args)>(
-//     [&tup](auto... Ixs) { return std::make_tuple(*std::get<Ixs>(*tup)...);
-//     });
-// }
-
-// template<class... Args>
-// constexpr auto
-// deref(const std::tuple<Args...>& tup)
-// {
-//   return index_apply<sizeof...(Args)>([&tup](auto... Ixs) {
-//     return std::forward_as_tuple(*std::get<Ixs>(tup)...);
-//   });
-// }
 
 template<class... Args>
 constexpr auto
@@ -225,12 +271,46 @@ disjunction_of(std::initializer_list<T> ilist)
 
 namespace itertools {
 
-template<typename T>
-struct iterator_value
-{
-  using type = typename std::iterator_traits<
-    std::decay_t<decltype((std::declval<T&>().begin()))>>::value_type;
-};
+using namespace tupletools;
+
+/*
+The zip and zip-iterator classes, respectively.
+
+Allows one to "zip" determinately any iterable type together, yielding thereupon
+subsequent iterations a n-tuple of respective iterable values.
+
+Each value yielded by aforesaid zip is declared as "const & T", so no copies are
+every made or attempted withal. The obstinancy of the yielded type is due to the
+rvalue acceptance provided herein. If a volatile reference is sought, one may
+circumvent the type by using the aforeprovided "const_downcast" methoed
+wherewith one may trivially assign or manipulate a now volatile reference.
+
+An example usage of zip:
+
+    std::vector<int> v1(10, 10);
+    std::list<float> l1(7, 1.234);
+
+    for (auto [i, j] : itertools::zip(v1, v2)) {
+        ...
+    }
+
+And to modify the const & of i or j:
+
+    tupletools::const_downcast(i) = "your value";
+
+An example of zip's r-value acquiescence:
+
+    std::vector<int> v1(10, 10);
+
+    for (auto [i, j] : itertools::zip(v1, std::list<float>{1.2, 1.2, 1.2}))
+    {
+        ...
+    }
+
+Notice that the hereinbefore shown containers were of unequal length:
+the zip iterator automatically scales downward to the smallest of the given
+container sizes.
+ */
 
 template<class... Args>
 class zip;
@@ -240,12 +320,15 @@ class zip_iterator
 {
 public:
   using iterator_category = std::forward_iterator_tag;
-  using value_type = std::tuple<typename iterator_value<Args>::type...>;
-  using pointer_type = std::tuple<typename iterator_value<Args>::type*...>*;
-  using reference_type = std::tuple<typename iterator_value<Args&>::type&...>&;
+  using value_type =
+    std::tuple<typename container_iterator_value<Args>::type...>;
+  using pointer_type =
+    std::tuple<typename container_iterator_value<Args>::type*...>*;
+  using reference_type =
+    std::tuple<typename container_iterator_value<Args&>::type&...>&;
 
   explicit zip_iterator(
-    decltype(std::declval<Args&>().begin())... args) noexcept
+    typename container_iterator_type<Args&>::type... args) noexcept
     : _args(args...)
   {}
 
@@ -253,7 +336,7 @@ public:
 
   zip_iterator& operator++()
   {
-    tupletools::increment_ref(_args);
+    increment_ref(_args);
     return *this;
   }
 
@@ -266,22 +349,20 @@ public:
 
   bool operator==(const zip_iterator& rhs) noexcept
   {
-    return !tupletools::any_of(tupletools::where(
-      [](auto x, auto y) { return x != y; }, _args, rhs._args));
+    return !any_of(
+      where([](auto x, auto y) { return x != y; }, _args, rhs._args));
   }
   bool operator!=(const zip_iterator& rhs) noexcept
   {
-    return !tupletools::any_of(tupletools::where(
-      [](auto x, auto y) { return x == y; }, _args, rhs._args));
+    return !any_of(
+      where([](auto x, auto y) { return x == y; }, _args, rhs._args));
   }
 
-  //   reference_type operator*() noexcept { return tupletools::deref(_args); }
-  //   auto& operator*() noexcept { return tupletools::deref(&_args); }
-  auto operator*() noexcept { return tupletools::deref(_args); }
+  const auto operator*() noexcept { return deref_fwd_const(_args); }
   auto operator-> () const noexcept -> pointer_type { return _args; }
 
 private:
-  std::tuple<decltype(std::declval<Args&>().begin())...> _args;
+  std::tuple<typename container_iterator_type<Args&>::type...> _args;
 };
 
 template<class... Args>
@@ -289,7 +370,7 @@ class zip
 {
 public:
   static constexpr std::size_t N = sizeof...(Args);
-  using iterator = zip_iterator<const Args...>;
+  using iterator = zip_iterator<const Args&...>;
   //   static_assert(sizeof...(Args) > 0, "!");
 
   //   template<typename... Ts>
@@ -299,14 +380,17 @@ public:
   //     , _end(
   //         std::forward<decltype(std::declval<Ts&>().begin())>(args.end())...){};
   //   zip(const Args&... args)
-  //     : _begin{std::forward<decltype(std::declval<Args&>().begin())>(
-  //         args.begin())...}
-  //     , _end{std::forward<decltype(std::declval<Args&>().begin())>(
-  //         args.end())...} {};
+  //     : _begin{std::forward<typename
+  //     container_iterator_type<Args&>::type>(args.begin())...} ,
+  //     _end{std::forward<typename
+  //     container_iterator_type<Args&>::type>(args.end())...}
+  //     {};
 
   zip(const Args&... args)
     : _begin(args.begin()...)
     , _end(args.end()...){};
+
+  zip(const std::tuple<Args...> args) { apply(args, this); }
 
   zip& operator=(const zip& rhs) = default;
 

@@ -251,11 +251,16 @@ public:
   }
   iterator end() noexcept { return generator_iterator<T>(nullptr); }
 
-  iterator begin() const { return begin(); }
-  iterator end() const { return end(); }
-
-  iterator cbegin() { return begin(); }
-  iterator cend() { return end(); }
+  iterator begin() const noexcept
+  {
+    if (_promise != nullptr) {
+      _promise->pull();
+      if (!_promise->done()) { return generator_iterator<T>(_promise); }
+      _promise->rethrow_if_exception();
+    }
+    return generator_iterator<T>(nullptr);
+  }
+  iterator end() const noexcept { return generator_iterator<T>(nullptr); }
 
 private:
   friend class generator_promise<T>;
