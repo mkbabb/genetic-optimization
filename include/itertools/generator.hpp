@@ -24,19 +24,20 @@ template<typename T>
 class awaitable
 {
 public:
+  using coroutine_handle =
+    std::experimental::coroutine_handle<generator_promise<T>>;
+
   awaitable(generator_promise<T>* promise)
     : _promise(promise)
   {}
 
   bool await_ready() noexcept { return _promise == nullptr; }
 
-  template<typename U>
-  void await_suspend(U) noexcept
-  {}
+  void await_suspend(coroutine_handle) noexcept {}
 
   void await_resume()
   {
-    if (!_promise) { _promise->rethrow_if_exception(); }
+    if (!_promise) { _promise->throw_exception(); }
   }
 
 private:
@@ -84,27 +85,21 @@ public:
 
   template<typename U = T,
            std::enable_if_t<!std::is_rvalue_reference<U>::value, int> = 0>
-  auto yield_value(generator<T>& generator) noexcept
+  auto yield_value(generator<T>&& gen) noexcept
   {
-    if (generator._promise) {
-      _parent->_child = generator._promise;
-      generator._promise->_parent = _parent;
-      generator._promise->_child = this;
-      generator._promise->resume();
-      if (!generator._promise->done()) {
-        return awaitable<T>{generator._promise};
-      }
+    if (gen._promise) {
+      _parent->_child = gen._promise;
+      gen._promise->_parent = _parent;
+      gen._promise->_child = this;
+      gen._promise->resume();
+      if (!gen._promise->done()) { return awaitable<T>{gen._promise}; }
     }
     return awaitable<T>{nullptr};
-  }
-  auto yield_value(generator<T>&& generator) noexcept
-  {
-    return yield_value(generator);
   }
 
   void unhandled_exception() { _exception = std::current_exception(); }
 
-  void rethrow_if_exception()
+  void throw_exception()
   {
     if (_exception) { std::rethrow_exception(_exception); }
   }
@@ -245,7 +240,7 @@ public:
     if (_promise != nullptr) {
       _promise->pull();
       if (!_promise->done()) { return generator_iterator<T>(_promise); }
-      _promise->rethrow_if_exception();
+      _promise->throw_exception();
     }
     return generator_iterator<T>(nullptr);
   }
@@ -256,7 +251,7 @@ public:
     if (_promise != nullptr) {
       _promise->pull();
       if (!_promise->done()) { return generator_iterator<T>(_promise); }
-      _promise->rethrow_if_exception();
+      _promise->throw_exception();
     }
     return generator_iterator<T>(nullptr);
   }

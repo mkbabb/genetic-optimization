@@ -5,6 +5,7 @@
 #include "generator.hpp"
 #include "itertools.hpp"
 
+#include <chrono>
 #include <experimental/coroutine>
 #include <iostream>
 #include <list>
@@ -14,82 +15,151 @@
 #include <vector>
 
 void
-tupletools_tests()
+zip_tests()
 {
-  auto tup1 = std::make_tuple(1, 2, 3, 4, 5, 6);
-  auto tup2 = std::make_tuple(33, 44, 77, 4, 5, 99);
+  {
+    std::vector<int> iv1 = {101, 102, 103, 104};
+    std::vector<int> iv2 = {9, 8, 7, 6, 5, 4, 3, 2};
+    std::vector<int> iv3 = {123, 1234, 12345};
 
-  auto tup_bool =
-    tupletools::where([](auto x, auto y) { return x == y; }, tup1, tup2);
-  bool bool1 = tupletools::any_of(tup_bool);
+    for (auto [i, j, k] : itertools::zip(iv1, iv2, iv3)) {};
+  }
+  {
+    std::vector<std::string> sv1 = {
+      "\nThis", "but", "different", "containers,"};
+    std::vector<std::string> sv2 = {"is", "can", "types", "too?"};
+    std::vector<std::string> sv3 = {
+      "cool,", "we iterate through", "of", "...\n"};
 
-  //   std::cout << std::boolalpha;
-  //   std::cout << bool1 << std::endl;
+    for (auto [i, j, k] : itertools::zip(sv1, sv2, sv3)) {};
+  }
+  {
+
+    std::list<std::string> sl1 = {
+      "Yes, we can!", "Some more numbers:", "More numbers!"};
+    std::vector<std::string> sv1 = {
+      "Different types, too!", "Ints and doubles.", ""};
+    std::list<int> iv1 = {1, 2, 3};
+    std::vector<double> dv1{3.141592653589793238, 1.6181, 2.71828};
+
+    for (auto [i, j, k, l] : itertools::zip(sl1, sv1, iv1, dv1)) {}
+  }
+  {
+    std::map<int, int> id1 = {
+      {0, 10}, {1, 11}, {2, 12}, {3, 13}, {4, 14}, {5, 15}};
+    std::list<std::string> sv = {"1", "mijn", "worten", "2", "helm", "dearth"};
+    std::vector<double> dv = {1.2, 3.4, 5.6, 6.7, 7.8, 8.9, 9.0};
+
+    for (auto [i, j, k, l] : itertools::zip(id1, sv, dv, itertools::range(7))) {
+      auto [key, value] = i;
+      //   fmt::print("{}: {}, {}, {}, {}", key, value, j, k, l);
+    }
+  }
+  {
+    std::vector<int> iv1(10, 10);
+    std::vector<int> iv2(10, 10);
+
+    auto tup = std::make_tuple(iv1, iv2);
+
+    for (auto [i, j] : itertools::zip(tup)) {}
+  }
 }
 
 void
-tupletools_zip_tests()
+tupletools_tests()
 {
-  std::vector<int> iv1 = {1, 2};
-  std::vector<int> iv2 = {99, 88, 77, 66};
-
-  for (auto [i, j] : itertools::zip(iv1, iv2)) {
-    // std::cout << i << " " << j << std::endl;
-  };
-
-  std::vector<std::string> sv1 = {"\nThis", "but", "different", "containers,"};
-  std::vector<std::string> sv2 = {"is", "can", "types", "too?"};
-  std::vector<std::string> sv3 = {"cool,", "we iterate through", "of", "...\n"};
-
-  for (auto [i, j, k] : itertools::zip(sv1, sv2, sv3)) {
-    // std::cout << i << " " << j << " " << k << std::endl;
-  };
-
-  std::list<std::string> sl1 = {
-    "Yes, we can!", "Some more numbers:", "More numbers!"};
-  std::vector<std::string> sv4 = {
-    "Different types, too!", "Ints and doubles.", ""};
-  std::list<int> iv3 = {1, 2, 3};
-  std::vector<double> dv5{3.141592653589793238, 1.6181, 2.71828};
-
-  for (auto [i, j, k, l] : itertools::zip(sl1, sv4, iv3, dv5)) {
-    // std::cout << i << " " << j << " " << k << " " << l << std::endl;
+  {
+    auto tup1 = std::make_tuple(1, 2, 3, 4);
+    assert(tupletools::to_string(tup1) == "(1, 2, 3, 4)");
   }
+  {
+    auto tup1 = tupletools::make_tuple_of<20>(true);
+    assert(tupletools::tuple_size<decltype(tup1)>::value == 20);
+  }
+}
 
-  std::vector<int> iv4 = {101, 102, 103, 104};
-  std::vector<int> iv5 = {9, 8, 7, 6, 5, 4, 3, 2};
-  std::vector<int> iv6 = {123, 1234, 12345};
+void
+itertools_tests()
+{
+  {
+    std::vector<std::string> sv1 = {"h", "e", "l", "l", "o"};
+    std::vector<int> iv1 = {1, 2, 3, 4, 5, 6, 7, 8};
 
-  // std::cout << "\nAutomatically adjusts and shrinks the iterator to the
-  //   "
-  //                "smallest of the zipped iterator sizes!\n"
-  //             << std::endl;
-
-  for (auto [i, j, k] : itertools::zip(iv4, iv5, iv6)) {
-    // std::cout << i << " " << j << " " << k << std::endl;
-  };
-
-  auto tup1 = std::make_tuple(1, 2, 3, 4);
-  auto tup2 = std::make_tuple(33.1414, 1UL, 2, 22, 1.1, 3.141);
-
-  //   std::cout << "We can print an entire tuple in one go, too:\n" <<
-  //   std::endl; std::cout << tupletools::to_string(tup1) << "\n" <<
-  //   std::endl;
-  //   std::cout << tupletools::to_string(tup2) << "\n" << std::endl;
+    assert(itertools::join(sv1, "") == "hello");
+    assert(itertools::join(sv1, ",") == "h,e,l,l,o");
+    assert(itertools::join(iv1, ", ") == "1, 2, 3, 4, 5, 6, 7, 8");
+  }
 }
 
 void
 any_tests()
 {
-  auto tup1 = std::make_tuple(1, 2, 3, 4);
-  auto tup2 = std::make_tuple(1, 2, 7, 4);
+  {
+    // Any tests with initializer list
+    auto tup1 = std::make_tuple(1, 2, 3, 4, 5, 6);
+    auto tup2 = std::make_tuple(33, 44, 77, 4, 5, 99);
 
-  auto ilist =
-    tupletools::where([](auto x, auto y) { return x == y; }, tup1, tup2);
+    auto tup_bool =
+      tupletools::where([](auto x, auto y) { return x == y; }, tup1, tup2);
+    bool bool1 = tupletools::any_of(tup_bool);
 
-  bool b1 = tupletools::disjunction_of(ilist);
-  //   std::cout << std::boolalpha;
-  //   std::cout << b1 << std::endl;
+    assert(bool1 == true);
+  }
+  {
+    // Any tests with tuple of booleans.
+    auto tup_bool1 = std::make_tuple(true, true, true, true, false);
+    auto tup_bool2 = std::make_tuple(false, false, false, false, false);
+
+    bool bool1 = tupletools::any_of(tup_bool1);
+    bool bool2 = tupletools::any_of(tup_bool2);
+
+    assert(bool1 == true);
+    assert(bool2 == false);
+  }
+  {
+    // All tests
+    auto tup1 = std::make_tuple(1, 2, 3, 4, 5, 6);
+    auto tup2 = std::make_tuple(1, 2, 3, 4, 5, 6);
+
+    auto tup_bool =
+      tupletools::where([](auto x, auto y) { return x == y; }, tup1, tup2);
+    bool bool1 = tupletools::all_of(tup_bool);
+
+    assert(bool1 == true);
+  }
+  {
+    // All tests with tuple of booleans.
+    auto tup_bool1 = std::make_tuple(true, true, true, true, false);
+    auto tup_bool2 = std::make_tuple(true, true, true, true, true);
+
+    bool bool1 = tupletools::all_of(tup_bool1);
+    bool bool2 = tupletools::all_of(tup_bool2);
+
+    assert(bool1 == false);
+    assert(bool2 == true);
+  }
+  {
+    // Disjunction tests
+    auto tup1 = std::make_tuple(1, 2, 3, 4);
+    auto tup2 = std::make_tuple(1, 2, 7, 4);
+
+    auto ilist =
+      tupletools::where([](auto x, auto y) { return x == y; }, tup1, tup2);
+
+    bool bool1 = tupletools::disjunction_of(ilist);
+    assert(bool1 == false);
+  }
+  {
+    // Disjunction tests with tuple of booleans.
+    auto tup_bool1 = std::make_tuple(true, true, true, false, false);
+    auto tup_bool2 = std::make_tuple(true, true, false, true, true);
+
+    bool bool1 = tupletools::disjunction_of(tup_bool1);
+    bool bool2 = tupletools::disjunction_of(tup_bool2);
+
+    assert(bool1 == true);
+    assert(bool2 == false);
+  }
 }
 
 void
@@ -119,11 +189,59 @@ enumerate_tests()
   }
 }
 
+template<std::size_t iterations = 1,
+         class... Funcs,
+         const std::size_t N = sizeof...(Funcs)>
+auto
+time_multiple(Funcs&&... funcs)
+  -> std::map<int, std::vector<std::chrono::microseconds>>
+{
+  std::map<int, std::vector<std::chrono::microseconds>> times;
+  std::map<int, std::vector<std::chrono::microseconds>> extremal_times;
+  for (int i = 0; i < N; i++) {
+    times[i] = std::vector<std::chrono::microseconds>{};
+  }
+  auto tup = std::make_tuple(funcs...);
+
+  auto func = [&](auto&& n, auto&& v) {
+    auto start = std::chrono::high_resolution_clock::now();
+    v();
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto time =
+      std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+    times[n].push_back(time);
+    return false;
+  };
+  for (int i = 0; i < iterations; i++) { tupletools::for_each(tup, func); }
+
+  return times;
+}
+
+void
+rvalue_zip_tests()
+{
+  {
+    std::vector<int> v1(10, 10);
+
+    for (auto [i, j] : itertools::zip(v1, std::vector<int>{1, 2, 3, 4})) {
+      tupletools::const_downcast(i) = 99;
+    }
+    for (auto [n, i] : itertools::enumerate(v1)) {
+      if (n < 4) { assert(i == 99); }
+    }
+    itertools::for_each(v1, [](auto&& n, auto&& v) {
+      tupletools::const_downcast(v) = 77;
+      return false;
+    });
+    for (auto [n, i] : itertools::enumerate(v1)) { assert(i == 77); }
+  }
+}
+
 void
 range_tests()
 {
   {
-    int stop = -999999;
+    int stop = -999'999;
     int j = stop;
     auto _range = itertools::range(stop);
     for (auto i : _range) {
@@ -133,7 +251,7 @@ range_tests()
     assert(j == 0);
   }
   {
-    int stop = 999999;
+    int stop = 1'999'999;
     int j = 0;
     auto _range = itertools::range(stop);
     for (auto i : _range) {
@@ -144,7 +262,7 @@ range_tests()
   }
 
   {
-    int stop = -999999;
+    int stop = -999'999;
     int j = stop;
     auto _range = itertools::range(stop, 0);
     for (auto i : _range) {
@@ -165,36 +283,70 @@ itertools::generator<int>
 rec(int n)
 {
   co_yield n;
-  if (n < 10) {
-    co_yield rec(n + 1);
-  } else {
-    co_yield 99;
-  }
+  if (n > 0) { co_yield rec(n - 1); }
   co_return;
 };
+
+void
+generator_tests()
+{
+  {
+    int n = 500'000;
+    auto gen = rec(n);
+    for (auto i : gen) { assert((n--) == i); }
+  }
+  {
+    int n = 500'000;
+    auto gen = inc(n);
+    n = 0;
+    for (auto i : gen) { assert((n++) == i); }
+  }
+}
 
 int
 main()
 {
-
+  zip_tests();
   any_tests();
-  tupletools_zip_tests();
-  // enumerate_tests();
-  //   range_tests();
+  enumerate_tests();
+  range_tests();
+  rvalue_zip_tests();
+  itertools_tests();
+  tupletools_tests();
+  generator_tests();
 
-  std::vector<int> v1(10, 10);
+  auto mijn_func1 = []() {
+    for (int i = 0; i < 1'000'000; i++) {};
+  };
 
-  for (auto [i, j] : itertools::zip(v1, std::vector<int>{1, 2, 3, 4})) {
-    tupletools::const_downcast(i) = 99;
+  auto mijn_func2 = []() {
+    for (int i = 0; i < 1'000'000; i++) {};
+  };
+
+  auto times = time_multiple<10>(mijn_func1, mijn_func2);
+  for (auto [key, value] : times) {
+    // fmt::print("function {}:\n", key);
+    for (auto time : value) {
+      // fmt::print("\t{}\n", time.count());
+    }
   }
 
-  for (auto [n, i] : itertools::enumerate(v1)) { fmt::print("{}, {}\n", n, i); }
-  fmt::print("yon1\n");
-  for (auto [n, i] : itertools::enumerate(v1)) { fmt::print("{}, {}\n", n, i); }
-  //   fmt::print("yon2\n");
-  //   for (auto [n, i] : itertools::enumerate(v1)) { fmt::print("{}, {}\n", n,
-  //   i); } fmt::print("yon3\n"); for (auto [n, i] : itertools::enumerate(v1))
-  //   { fmt::print("{}, {}\n", n, i); }
+  auto tup1 = std::make_tuple(37);
+  const auto tup2 = std::make_tuple(1, tup1);
+  auto tup3 = std::make_tuple(1, 2, tup2, 3, tup2, std::make_tuple(99));
 
+  std::ostringstream oss;
+
+  auto tt = tupletools::flatten(tup3);
+  auto mijn = std::make_tuple(1, 2, 3, 1.4);
+
+  tupletools::for_each(mijn, [&oss](auto&& n, auto&& v) {
+    oss << v << ", ";
+    v += 1;
+  });
+
+  fmt::print("{}\n", oss.str());
+
+  fmt::print("tests complete\n");
   return 0;
 }
