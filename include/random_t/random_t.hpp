@@ -7,7 +7,6 @@
 
 #include <cmath>
 #include <cstdint>
-#include <functional>
 
 #pragma once
 
@@ -15,7 +14,7 @@ namespace random_t {
 
 template<typename StateType = uint64_t,
          typename OutputType = uint32_t,
-         typename DriverType = typename std::function<OutputType(StateType*)>>
+         typename DriverType = void>
 class Random
 {
   StateType _state;

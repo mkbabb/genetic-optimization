@@ -6,6 +6,7 @@
 #include "itertools.hpp"
 
 #include <chrono>
+#include <deque>
 #include <experimental/coroutine>
 #include <iostream>
 #include <list>
@@ -169,7 +170,6 @@ enumerate_tests()
     std::vector<int> v1(100000, 0);
     int j = 0;
     int k = 0;
-
     for (auto [n, i] : itertools::enumerate(v1)) {
       j++;
       k = n;
@@ -187,34 +187,6 @@ enumerate_tests()
     }
     assert((j - 1) == k);
   }
-}
-
-template<std::size_t iterations = 1,
-         class... Funcs,
-         const std::size_t N = sizeof...(Funcs)>
-auto
-time_multiple(Funcs&&... funcs)
-  -> std::map<int, std::vector<std::chrono::microseconds>>
-{
-  std::map<int, std::vector<std::chrono::microseconds>> times;
-  std::map<int, std::vector<std::chrono::microseconds>> extremal_times;
-  for (int i = 0; i < N; i++) {
-    times[i] = std::vector<std::chrono::microseconds>{};
-  }
-  auto tup = std::make_tuple(funcs...);
-
-  auto func = [&](auto&& n, auto&& v) {
-    auto start = std::chrono::high_resolution_clock::now();
-    v();
-    auto stop = std::chrono::high_resolution_clock::now();
-    auto time =
-      std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
-    times[n].push_back(time);
-    return false;
-  };
-  for (int i = 0; i < iterations; i++) { tupletools::for_each(tup, func); }
-
-  return times;
 }
 
 void
@@ -288,10 +260,20 @@ rec(int n)
 };
 
 void
+rec2(int n)
+{
+  std::vector<int> t = {1, 2, 3, 4, 5, 6, 7, 8};
+  int to = 0;
+  for (auto i : itertools::range(1000)) { to++; }
+  for (auto i : itertools::enumerate(t)) { to++; }
+  if (n < 1'000) { rec2(n + 1); }
+};
+
+void
 generator_tests()
 {
   {
-    int n = 500'000;
+    int n = 5'000;
     auto gen = rec(n);
     for (auto i : gen) { assert((n--) == i); }
   }
@@ -301,51 +283,180 @@ generator_tests()
     n = 0;
     for (auto i : gen) { assert((n++) == i); }
   }
+  {
+    rec2(0);
+  }
 }
 
-int
-main()
+void
+time_multiple_tests()
 {
-  zip_tests();
-  any_tests();
-  enumerate_tests();
-  range_tests();
-  rvalue_zip_tests();
-  itertools_tests();
-  tupletools_tests();
-  generator_tests();
-
   auto mijn_func1 = []() {
     for (int i = 0; i < 1'000'000; i++) {};
   };
 
   auto mijn_func2 = []() {
-    for (int i = 0; i < 1'000'000; i++) {};
+    int t = 0;
+    for (int i = 0; i < 1'000'000; i++) { t++; };
   };
 
-  auto times = time_multiple<10>(mijn_func1, mijn_func2);
+  auto [times, extremal_times] =
+    itertools::time_multiple(10, mijn_func1, mijn_func2);
   for (auto [key, value] : times) {
     // fmt::print("function {}:\n", key);
-    for (auto time : value) {
-      // fmt::print("\t{}\n", time.count());
-    }
+    // fmt::print("min: {}, max: {}\n",
+    //            extremal_times[key][0].count(),
+    //            extremal_times[key][1].count());
+    // for (auto time : value) { fmt::print("\t{}\n", time.count()); }
   }
+}
 
-  auto tup1 = std::make_tuple(37);
-  const auto tup2 = std::make_tuple(1, tup1);
-  auto tup3 = std::make_tuple(1, 2, tup2, 3, tup2, std::make_tuple(99));
+void
+to_string_tests(bool print = false)
+{
+  {
+    auto iter = std::make_tuple(1, 2, 3, 4, 5, 6);
+    auto ndim = itertools::get_ndim(iter);
+    std::string s = itertools::to_string(
+      iter, [](auto&& v) -> std::string { return std::to_string(v); });
+    if (print) { std::cout << s << std::endl; }
+  }
+  {
+    auto iter = std::make_tuple(std::make_tuple(1, 2, 3, 4, 5, 6),
+                                std::make_tuple(1, 2, 3, 4, 5, 6),
+                                std::make_tuple(1, 2, 3, 4, 5, 6));
+    auto ndim = itertools::get_ndim(iter);
+    std::string s = itertools::to_string(iter, [](auto&& v) -> std::string {
+      return " " + std::to_string(v) + " ";
+    });
+    if (print) { std::cout << s << std::endl; }
+  }
+  {
+    std::vector<std::map<int, int>> iter = {{{1, 2}, {3, 4}}, {{5, 6}, {7, 8}}};
+    auto ndim = itertools::get_ndim(iter);
+    std::string s = itertools::to_string(
+      iter, [](auto&& v) -> std::string { return std::to_string(v); });
+    if (print) { std::cout << s << std::endl; }
+  }
+  {
+    std::vector<std::tuple<std::vector<std::vector<std::vector<int>>>, int>>
+      iter = {{{{{1, 2}}, {{3, 4}}}, 1}, {{{{5, 6}}, {{7, 8}}}, 4}};
+    auto ndim = itertools::get_ndim(iter);
+    std::string s = itertools::to_string(
+      iter, [](auto&& v) -> std::string { return std::to_string(v); });
+    if (print) { std::cout << s << std::endl; }
+  }
+  {
+    std::vector<std::list<std::vector<std::list<std::vector<std::deque<int>>>>>>
+      iter = {{{{{{0, 1}, {2, 3}},
 
-  std::ostringstream oss;
+                 {{4, 5}, {6, 7}}},
 
-  auto tt = tupletools::flatten(tup3);
-  auto mijn = std::make_tuple(1, 2, 3, 1.4);
+                {{{8, 9}, {10, 11}},
 
-  tupletools::for_each(mijn, [&oss](auto&& n, auto&& v) {
-    oss << v << ", ";
-    v += 1;
-  });
+                 {{12, 13}, {14, 15}}}},
 
-  fmt::print("{}\n", oss.str());
+               {{{{16, 17}, {18, 19}},
+
+                 {{20, 21}, {22, 23}}},
+
+                {{{24, 25}, {26, 27}},
+
+                 {{28, 29}, {30, 31}}}}},
+
+              {{{{{32, 33}, {34, 35}},
+
+                 {{36, 37}, {38, 39}}},
+
+                {{{40, 41}, {42, 43}},
+
+                 {{44, 45}, {46, 47}}}},
+
+               {{{{48, 49}, {50, 51}},
+
+                 {{52, 53}, {54, 55}}},
+
+                {{{56, 57}, {58, 59}},
+
+                 {{60, 61}, {62, 63}}}}}};
+    auto ndim = itertools::get_ndim(iter);
+    std::string s = itertools::to_string(
+      iter, [](auto&& v) -> std::string { return std::to_string(v); });
+    if (print) { std::cout << s << std::endl; }
+  }
+  {
+    std::vector<std::tuple<std::list<std::vector<std::vector<int>>>,
+                           int,
+                           std::map<int, std::tuple<int, int, int>>>>
+      iter = {
+        {{{{1, 2}}, {{3, 4}}},
+         1,
+         {{1, {0, 1, 2}}, {2, {1, 2, 3}}, {3, {2, 3, 4}}, {4, {3, 4, 5}}}},
+        {{{{5, 6}}, {{7, 8}}},
+         4,
+         {{1, {0, 1, 2}}, {2, {1, 2, 3}}, {3, {2, 3, 4}}, {4, {3, 4, 5}}}}};
+    auto ndim = itertools::get_ndim(iter);
+    std::string s = itertools::to_string(
+      iter, [](auto&& v) -> std::string { return std::to_string(v); });
+    if (print) { std::cout << s << std::endl; }
+  }
+  {
+    std::vector<std::vector<int>> iter = {
+      {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16,
+       17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
+       34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+       51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
+       68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84,
+       85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99},
+      {0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16,
+       17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
+       34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+       51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
+       68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84,
+       85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99}};
+    auto ndim = itertools::get_ndim(iter);
+    std::string s = itertools::to_string(
+      iter, [](auto&& v) -> std::string { return std::to_string(v); });
+    if (print) { std::cout << s << std::endl; }
+  }
+}
+
+int
+main()
+{
+  //   zip_tests();
+  //   any_tests();
+  //   enumerate_tests();
+  //   range_tests();
+  //   rvalue_zip_tests();
+  //   itertools_tests();
+  //   tupletools_tests();
+  //   generator_tests();
+  //   time_multiple_tests();
+  //   to_string_tests();
+
+  size_t N = 1'000'000;
+
+  auto func1 = [&]() {
+    size_t t = 0;
+    for (auto i : itertools::range(N)) { t++; };
+    return t;
+  };
+
+  auto func2 = [&]() {
+    size_t t = 0;
+    for (size_t i = 0; i < N; i++) { t++; };
+    return t;
+  };
+
+  auto [times, extremal_times] = itertools::time_multiple(100, func1, func2);
+  for (auto [key, value] : times) {
+    fmt::print("function {}:\n", key);
+    fmt::print("min: {}, max: {}\n",
+               extremal_times[key][0].count(),
+               extremal_times[key][1].count());
+    for (auto time : value) { fmt::print("\t{}\n", time.count()); }
+  }
 
   fmt::print("tests complete\n");
   return 0;

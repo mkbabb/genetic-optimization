@@ -31,13 +31,13 @@ public:
     : _promise(promise)
   {}
 
-  bool await_ready() noexcept { return _promise == nullptr; }
+  bool await_ready() noexcept { return this->_promise == nullptr; }
 
   void await_suspend(coroutine_handle) noexcept {}
 
   void await_resume()
   {
-    if (!_promise) { _promise->throw_exception(); }
+    if (!this->_promise) { this->_promise->re_throw_exception(); }
   }
 
 private:
@@ -49,7 +49,7 @@ class generator_promise
 {
 public:
   using value_type = std::remove_reference_t<T>;
-  using reference_type = std::conditional_t<std::is_reference_v<T>, T, T&>;
+  using reference_type = value_type&;
   using pointer_type = value_type*;
   using coroutine_handle =
     std::experimental::coroutine_handle<generator_promise<T>>;
@@ -74,17 +74,21 @@ public:
   }
 
   template<typename U = T,
-           std::enable_if_t<!std::is_same<typename std::remove_pointer<U>::type,
-                                          generator<T>>(),
-                            int> = 0>
-  auto yield_value(U&& v) noexcept
+           std::enable_if_t<!std::is_rvalue_reference<U>::value, int> = 0>
+  auto yield_value(std::remove_reference_t<T>& v) noexcept
+  {
+    _value = std::addressof(v);
+    return std::experimental::suspend_always{};
+  }
+
+  auto yield_value(std::remove_reference_t<T>&& v) noexcept
   {
     _value = std::addressof(v);
     return std::experimental::suspend_always{};
   }
 
   template<typename U = T,
-           std::enable_if_t<!std::is_rvalue_reference<U>::value, int> = 0>
+           std::enable_if_t<!std::is_rvalue_reference_v<U>, int> = 0>
   auto yield_value(generator<T>&& gen) noexcept
   {
     if (gen._promise) {
@@ -99,7 +103,7 @@ public:
 
   void unhandled_exception() { _exception = std::current_exception(); }
 
-  void throw_exception()
+  void re_throw_exception()
   {
     if (_exception) { std::rethrow_exception(_exception); }
   }
@@ -112,23 +116,24 @@ public:
 
   reference_type value() noexcept
   {
-    assert(this == _parent && !this->done());
+    assert(this == _parent);
+    assert(!this->done());
     return *(_child->_value);
   }
 
   template<typename U>
   std::experimental::suspend_never await_transform(U&& value) = delete;
 
-  generator_promise* pull() noexcept
+  void pull() noexcept
   {
-    assert(this == _parent && !_child->done());
+    assert(this == _parent);
+    assert(!_child->done());
     _child->resume();
 
     while (_child != this && _child->done()) {
       _child = _child->_child;
       _child->resume();
     }
-    return this;
   }
 
 private:
@@ -145,7 +150,7 @@ class generator_iterator : public std::iterator<std::input_iterator_tag, T>
 
 public:
   using iterator_category = std::input_iterator_tag;
-  using difference_type = std::size_t;
+  using difference_type = size_t;
   using value_type = typename generator_promise<T>::value_type;
   using reference_type = typename generator_promise<T>::reference_type;
   using pointer_type = typename generator_promise<T>::pointer_type;
@@ -172,8 +177,10 @@ public:
 
   generator_iterator* operator++()
   {
-    assert(_promise && !_promise->done());
-    if (_promise->pull()->done()) { _promise = nullptr; }
+    assert(_promise);
+    assert(!_promise->done());
+    _promise->pull();
+    if (_promise->done()) { _promise = nullptr; }
     return this;
   }
 
@@ -182,13 +189,13 @@ public:
   reference_type operator*() const noexcept
   {
     assert(_promise);
-    return static_cast<reference_type>(_promise->value());
+    return _promise->value();
   }
 
   pointer_type operator->() const noexcept
   {
     assert(_promise);
-    return static_cast<reference_type>(std::addressof(_promise->value()));
+    return std::addressof(_promise->value());
   }
 
 private:
@@ -196,7 +203,7 @@ private:
 };
 
 template<typename T>
-class generator
+class [[nodiscard]] generator
 {
 public:
   using promise_type = generator_promise<T>;
@@ -208,10 +215,10 @@ public:
   generator() noexcept
     : _promise(nullptr)
   {}
-  generator(promise_type& promise) noexcept
+  generator(promise_type & promise) noexcept
     : _promise(&promise)
   {}
-  generator(generator&& generator) noexcept
+  generator(generator && generator) noexcept
   {
     _promise = generator._promise;
     generator._promise = nullptr;
@@ -220,7 +227,7 @@ public:
 
   ~generator()
   {
-    if (_promise) { _promise->destroy(); }
+    if (_promise && _promise->done()) { _promise->destroy(); }
   }
 
   generator& operator=(const generator& rhs) = delete;
@@ -235,27 +242,18 @@ public:
     return *this;
   }
 
+  size_t size() { return INT64_MAX; }
+
   iterator begin()
   {
-    if (_promise != nullptr) {
+    if (_promise) {
       _promise->pull();
       if (!_promise->done()) { return generator_iterator<T>(_promise); }
-      _promise->throw_exception();
+      _promise->re_throw_exception();
     }
     return generator_iterator<T>(nullptr);
   }
   iterator end() noexcept { return generator_iterator<T>(nullptr); }
-
-  iterator begin() const noexcept
-  {
-    if (_promise != nullptr) {
-      _promise->pull();
-      if (!_promise->done()) { return generator_iterator<T>(_promise); }
-      _promise->throw_exception();
-    }
-    return generator_iterator<T>(nullptr);
-  }
-  iterator end() const noexcept { return generator_iterator<T>(nullptr); }
 
 private:
   friend class generator_promise<T>;
@@ -263,5 +261,5 @@ private:
 
   promise_type* _promise;
 };
-};
+};     // namespace itertools
 #endif // GENERATOR_H

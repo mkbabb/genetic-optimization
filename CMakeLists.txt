@@ -4,12 +4,9 @@ project(erate VERSION 0.1.0)
 
 set(CMAKE_CXX_COMPILER "/usr/local/Cellar/llvm/8.0.0_1/bin/clang++")
 
-set(COMPILE_FLAGS "-fcoroutines-ts -stdlib=libc++ -std=c++17")
-# set(LINK_FLAGS "${LINK_FLAGS} -stdlib=libc++")
+set(COMPILE_FLAGS "-fcoroutines-ts -stdlib=libc++ -std=c++2a -O2")
 
-# include_directories(/usr/local/Cellar/llvm/8.0.0_1/include/c++/v1)
-
-
+# -O1 -fno-signed-zeros -freciprocal-math -ffp-contract=fast -fno-trapping-math -ffast-math -ffinite-math-only
 
 
 add_definitions(${COMPILE_FLAGS})
