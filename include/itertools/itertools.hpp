@@ -2,7 +2,6 @@
 #define ITERTOOLS_H
 
 #include "generator.hpp"
-#include "it.hpp"
 #include "types.hpp"
 
 #include <algorithm>
@@ -47,7 +46,8 @@ index_apply(Func&& func)
 }
 
 /*
-Essentially a clone of std::apply; an academic exercise.
+Essentially a clone of std::apply; an academic exercise using expression
+folding.
  */
 template<class Tup, class Func, const size_t N = tuple_size<Tup>::value>
 constexpr auto
@@ -183,7 +183,7 @@ template<class Pred,
          const size_t N = tupletools::tuple_size_v<Tup1>,
          const size_t M = tupletools::tuple_size_v<Tup2>>
 constexpr bool
-what(Pred&& pred, Tup1&& tup1, Tup2&& tup2)
+any_where(Pred&& pred, Tup1&& tup1, Tup2&& tup2)
 {
   static_assert(N == M, "Tuples must be the same size!");
   return index_apply<N>([&](auto... Ixs) {
@@ -194,17 +194,19 @@ what(Pred&& pred, Tup1&& tup1, Tup2&& tup2)
   });
 }
 
-template<class Tup1,
+template<class Pred,
+         class Tup1,
          class Tup2,
          const size_t N = tupletools::tuple_size_v<Tup1>,
          const size_t M = tupletools::tuple_size_v<Tup2>>
 constexpr bool
-eq(Tup1&& tup1, Tup2&& tup2)
+all_where(Pred&& pred, Tup1&& tup1, Tup2&& tup2)
 {
   static_assert(N == M, "Tuples must be the same size!");
   return index_apply<N>([&](auto... Ixs) {
-    return (((std::get<Ixs>(std::forward<Tup1>(tup1)) ==
-              std::get<Ixs>(std::forward<Tup2>(tup2)))) ||
+    return ((std::invoke(std::forward<Pred>(pred),
+                         std::get<Ixs>(std::forward<Tup1>(tup1)),
+                         std::get<Ixs>(std::forward<Tup2>(tup2)))) &&
             ...);
   });
 }
@@ -392,7 +394,7 @@ An example of zip's r-value acquiescence:
         ...
     }
 
-Notice that the hereinbefore shown containers were of unequal length:
+Notice the hereinbefore shown containers were of unequal length:
 the zip iterator automatically scales downward to the smallest of the given
 container sizes.
  */
@@ -412,7 +414,7 @@ public:
     : _args(std::forward<Args>(args)...)
   {}
 
-  auto& operator++()
+  constexpr auto& operator++()
   {
     increment_ref(std::forward<pointer_type>(_args));
     return *this;
@@ -421,8 +423,9 @@ public:
   template<typename T>
   constexpr bool operator==(T&& rhs)
   {
-    return eq(std::forward<pointer_type>(_args),
-              std::forward<decltype(rhs._args)>(rhs._args));
+    return any_where([](auto&& x, auto&& y) { return x == y; },
+                     std::forward<pointer_type>(_args),
+                     std::forward<decltype(rhs._args)>(rhs._args));
   }
   template<typename T>
   constexpr bool operator!=(T&& rhs)
@@ -519,10 +522,10 @@ grange(T stop)
   return grange<T>(start, stop);
 }
 
-template<class T>
+template<typename T = size_t>
 class range;
 
-template<class T>
+template<typename T = size_t>
 class range_iterator : public std::iterator<std::forward_iterator_tag, T>
 {
 public:
@@ -551,7 +554,7 @@ private:
   range<T> _seq;
 };
 
-template<class T = size_t>
+template<typename T>
 class [[nodiscard]] range
 {
 public:
@@ -605,16 +608,6 @@ enumerate(Iterable&& iter)
              std::forward<Iterable>(iter));
 }
 
-template<class Iterable>
-constexpr Iterable
-swap(Iterable&& iter, int ix1, int ix2)
-{
-  auto t = iter[ix1];
-  iter[ix1] = iter[ix2];
-  iter[ix2] = t;
-  return iter;
-}
-
 /*
 High order functor, whereof: applies a binary function of type BinaryFunction,
 func, over an iterable range of type Iterable, iter. func must accept two
@@ -636,40 +629,72 @@ for_each(Iterable&& iter, BinaryFunction&& func)
 {
   for (auto [n, i] : enumerate(iter)) {
     bool b = std::invoke(std::forward<BinaryFunction>(func),
-                         std::forward<const size_t>(n),
-                         std::forward<const IterableValue>(i));
+                         std::forward<size_t>(n),
+                         std::forward<decltype(i)>(i));
     if (b) { break; }
   }
   return iter;
 }
 
-template<class Iterable>
-constexpr void
-roll(Iterable&& iter, int axis)
+template<typename ReductionValue = int, class Iterable, class NaryFunction>
+constexpr ReductionValue
+reduce(Iterable&& iter, ReductionValue init, NaryFunction&& func)
 {
-  int ndim = iter.size();
-  if (axis == 0) {
-    return;
-  } else if (axis < 0) {
-    axis += ndim;
-  }
-  int i = 0;
-  while (i++ < axis) { swap(std::forward<Iterable>(iter), axis, i); };
+  itertools::for_each(iter, [&](auto n, auto&& v) {
+    init = func(n, std::forward<decltype(v)>(v), init);
+    return false;
+  });
+  return init;
 }
 
-template<typename Func>
+template<typename ReductionValue, class Iterable>
+constexpr ReductionValue
+sum(Iterable&& iter)
+{
+  return itertools::reduce<ReductionValue>(
+    iter, 0, [](auto n, auto v, auto i) { return i + v; });
+}
+
+template<class Iterable>
+constexpr Iterable
+swap(Iterable&& iter, int ix1, int ix2)
+{
+  assert(ix1 < iter.size() && ix2 < iter.size());
+  auto t = iter[ix1];
+  iter[ix1] = iter[ix2];
+  iter[ix2] = t;
+  return iter;
+}
+
+template<class Iterable>
+constexpr Iterable
+roll(Iterable&& iter, int axis = -1)
+{
+  if (axis == 0) {
+    return iter;
+  } else if (axis == -1) {
+    axis = iter.size() - 1;
+  }
+  int i = 0;
+  while (i < axis) {
+    itertools::swap(std::forward<Iterable>(iter), axis, i++);
+  };
+  return iter;
+}
+
+template<class Func>
 struct y_combinator
 {
   Func func;
   y_combinator(Func func)
     : func(std::move(func))
   {}
-  template<typename... Args>
+  template<class... Args>
   auto operator()(Args&&... args) const
   {
     return func(std::ref(*this), std::forward<Args>(args)...);
   }
-  template<typename... Args>
+  template<class... Args>
   auto operator()(Args&&... args)
   {
     return func(std::ref(*this), std::forward<Args>(args)...);
@@ -681,8 +706,12 @@ auto
 time_multiple(size_t iterations, Funcs&&... funcs)
 {
   using namespace std::chrono;
+  using integral_time_t = decltype(std::declval<microseconds>().count());
+
   std::map<int, std::vector<microseconds>> times;
-  std::map<int, std::vector<microseconds>> extremal_times;
+  std::map<int, std::vector<integral_time_t>> extremal_times;
+
+  for (auto i : range(N)) { times[i].reserve(iterations); }
 
   auto tup = std::make_tuple(std::forward<Funcs>(funcs)...);
 
@@ -700,7 +729,14 @@ time_multiple(size_t iterations, Funcs&&... funcs)
   itertools::for_each(times, [&](auto&& n, auto&& v) {
     auto [key, value] = v;
     std::sort(value.begin(), value.end());
-    extremal_times[key] = {value[0], value[value.size() - 1]};
+
+    integral_time_t avg =
+      itertools::reduce<integral_time_t>(
+        value, 0, [](auto n, auto v, auto i) { return v.count() + i; }) /
+      iterations;
+
+    extremal_times[key] = {
+      value[0].count(), value[value.size() - 1].count(), avg};
     return false;
   });
   return std::make_tuple(times, extremal_times);

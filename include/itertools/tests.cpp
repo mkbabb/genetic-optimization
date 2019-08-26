@@ -48,12 +48,13 @@ zip_tests()
   {
     std::map<int, int> id1 = {
       {0, 10}, {1, 11}, {2, 12}, {3, 13}, {4, 14}, {5, 15}};
-    std::list<std::string> sv = {"1", "mijn", "worten", "2", "helm", "dearth"};
-    std::vector<double> dv = {1.2, 3.4, 5.6, 6.7, 7.8, 8.9, 9.0};
+    std::list<std::string> sv1 = {"1", "mijn", "worten", "2", "helm", "dearth"};
+    std::vector<double> dv1 = {1.2, 3.4, 5.6, 6.7, 7.8, 8.9, 9.0};
 
-    for (auto [i, j, k, l] : itertools::zip(id1, sv, dv, itertools::range(7))) {
+    for (auto [i, j, k, l] :
+         itertools::zip(id1, sv1, dv1, itertools::range(7))) {
       auto [key, value] = i;
-      //   fmt::print("{}: {}, {}, {}, {}", key, value, j, k, l);
+      fmt::print("{}: {}, {}, {}, {}\n", key, value, j, k, l);
     }
   }
   {
@@ -90,6 +91,11 @@ itertools_tests()
     assert(itertools::join(sv1, ",") == "h,e,l,l,o");
     assert(itertools::join(iv1, ", ") == "1, 2, 3, 4, 5, 6, 7, 8");
   }
+  {
+    std::vector<int> iv1 = {1, 2, 3, 4, 5, 6, 7, 8};
+    itertools::roll(itertools::roll(iv1));
+    assert(iv1 == (std::vector<int>{7, 8, 1, 2, 3, 4, 5, 6}));
+  }
 }
 
 void
@@ -101,10 +107,13 @@ any_tests()
     auto tup2 = std::make_tuple(33, 44, 77, 4, 5, 99);
 
     auto tup_bool =
-      tupletools::where([](auto x, auto y) { return x == y; }, tup1, tup2);
+      tupletools::where([](auto&& x, auto&& y) { return x == y; }, tup1, tup2);
     bool bool1 = tupletools::any_of(tup_bool);
+    bool bool2 = tupletools::any_where(
+      [](auto&& x, auto&& y) { return x == y; }, tup1, tup2);
 
     assert(bool1 == true);
+    assert(bool1 = bool2);
   }
   {
     // Any tests with tuple of booleans.
@@ -123,10 +132,13 @@ any_tests()
     auto tup2 = std::make_tuple(1, 2, 3, 4, 5, 6);
 
     auto tup_bool =
-      tupletools::where([](auto x, auto y) { return x == y; }, tup1, tup2);
+      tupletools::where([](auto&& x, auto&& y) { return x == y; }, tup1, tup2);
     bool bool1 = tupletools::all_of(tup_bool);
+    bool bool2 = tupletools::all_where(
+      [](auto&& x, auto&& y) { return x == y; }, tup1, tup2);
 
     assert(bool1 == true);
+    assert(bool1 = bool2);
   }
   {
     // All tests with tuple of booleans.
@@ -145,7 +157,7 @@ any_tests()
     auto tup2 = std::make_tuple(1, 2, 7, 4);
 
     auto ilist =
-      tupletools::where([](auto x, auto y) { return x == y; }, tup1, tup2);
+      tupletools::where([](auto&& x, auto&& y) { return x == y; }, tup1, tup2);
 
     bool bool1 = tupletools::disjunction_of(ilist);
     assert(bool1 == false);
@@ -166,6 +178,7 @@ any_tests()
 void
 enumerate_tests()
 {
+  auto tup = std::make_tuple(1, 2);
   {
     std::vector<int> v1(100000, 0);
     int j = 0;
@@ -173,6 +186,7 @@ enumerate_tests()
     for (auto [n, i] : itertools::enumerate(v1)) {
       j++;
       k = n;
+      std::get<0>(tup);
     }
     assert((j - 1) == k);
   }
@@ -184,6 +198,7 @@ enumerate_tests()
     for (auto [n, i] : itertools::enumerate(v1)) {
       j++;
       k = n;
+      std::get<0>(tup);
     }
     assert((j - 1) == k);
   }
@@ -273,7 +288,7 @@ void
 generator_tests()
 {
   {
-    int n = 5'000;
+    int n = 7'000;
     auto gen = rec(n);
     for (auto i : gen) { assert((n--) == i); }
   }
@@ -289,25 +304,102 @@ generator_tests()
 }
 
 void
+reduction_tests()
+{
+  {
+    std::vector<std::tuple<int, int>> iter = {
+      {0, 1}, {1, 2}, {3, 4}, {5, 6}, {7, 8}};
+
+    int sm = itertools::reduce<int>(
+      iter, 0, [](auto n, auto v, auto i) { return std::get<0>(v) + i; });
+
+    assert(sm == 16);
+
+    int ml = itertools::reduce<int>(
+      iter, 1, [](auto n, auto v, auto i) { return std::get<1>(v) * i; });
+
+    assert(ml == 384);
+  }
+  {
+    std::vector<int> iter = {
+      0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16,
+      17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33,
+      34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+      51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
+      68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84,
+      85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99};
+
+    int sm = itertools::sum<int>(iter);
+
+    assert(sm == 4950);
+  }
+}
+
+void
 time_multiple_tests()
 {
-  auto mijn_func1 = []() {
-    for (int i = 0; i < 1'000'000; i++) {};
-  };
+  size_t N = 1'000;
+  {
+    size_t M = 10'000;
 
-  auto mijn_func2 = []() {
-    int t = 0;
-    for (int i = 0; i < 1'000'000; i++) { t++; };
-  };
+    auto func1 = [&]() {
+      size_t t = 0;
+      std::string h = "";
+      for (auto i : itertools::range(M)) { h = std::to_string(i); };
+      return t;
+    };
 
-  auto [times, extremal_times] =
-    itertools::time_multiple(10, mijn_func1, mijn_func2);
-  for (auto [key, value] : times) {
-    // fmt::print("function {}:\n", key);
-    // fmt::print("min: {}, max: {}\n",
-    //            extremal_times[key][0].count(),
-    //            extremal_times[key][1].count());
-    // for (auto time : value) { fmt::print("\t{}\n", time.count()); }
+    auto func2 = [&]() {
+      size_t t = 0;
+      std::string h = "";
+      for (size_t i = 0; i < M; i++) { h = std::to_string(i); };
+      return t;
+    };
+
+    auto [times, extremal_times] = itertools::time_multiple(N, func1, func2);
+    for (auto [key, value] : times) {
+      fmt::print("function {}:\n", key);
+      for (auto i : extremal_times[key]) { fmt::print("\t{}\n", i); }
+    }
+  }
+  {
+    size_t M = 10'000;
+
+    auto func1 = [&]() {
+      std::vector<int> iv1(M, 1);
+      std::string h = "";
+      for (auto [n, i] : itertools::enumerate(iv1)) {
+        h = std::to_string(n);
+        h = std::to_string(i);
+      };
+    };
+
+    auto func2 = [&]() {
+      std::vector<int> iv1(M, 1);
+      std::string h = "";
+      for (auto [n, i] : itertools::zip(itertools::range(iv1.size()), iv1)) {
+        h = std::to_string(n);
+        h = std::to_string(i);
+      };
+    };
+
+    auto func3 = [&]() {
+      std::vector<int> iv1(M, 1);
+      std::string h = "";
+      size_t n = 0;
+      for (auto i : iv1) {
+        h = std::to_string(n);
+        h = std::to_string(i);
+        n++;
+      };
+    };
+
+    auto [times, extremal_times] =
+      itertools::time_multiple(N, func1, func2, func3);
+    for (auto [key, value] : times) {
+      fmt::print("function {}:\n", key);
+      for (auto i : extremal_times[key]) { fmt::print("\t{}\n", i); }
+    }
   }
 }
 
@@ -424,39 +516,17 @@ to_string_tests(bool print = false)
 int
 main()
 {
-  //   zip_tests();
-  //   any_tests();
-  //   enumerate_tests();
-  //   range_tests();
-  //   rvalue_zip_tests();
-  //   itertools_tests();
-  //   tupletools_tests();
-  //   generator_tests();
-  //   time_multiple_tests();
-  //   to_string_tests();
-
-  size_t N = 1'000'000;
-
-  auto func1 = [&]() {
-    size_t t = 0;
-    for (auto i : itertools::range(N)) { t++; };
-    return t;
-  };
-
-  auto func2 = [&]() {
-    size_t t = 0;
-    for (size_t i = 0; i < N; i++) { t++; };
-    return t;
-  };
-
-  auto [times, extremal_times] = itertools::time_multiple(100, func1, func2);
-  for (auto [key, value] : times) {
-    fmt::print("function {}:\n", key);
-    fmt::print("min: {}, max: {}\n",
-               extremal_times[key][0].count(),
-               extremal_times[key][1].count());
-    for (auto time : value) { fmt::print("\t{}\n", time.count()); }
-  }
+  zip_tests();
+  any_tests();
+  enumerate_tests();
+  range_tests();
+  rvalue_zip_tests();
+  itertools_tests();
+  tupletools_tests();
+  reduction_tests();
+  generator_tests();
+  time_multiple_tests();
+  to_string_tests();
 
   fmt::print("tests complete\n");
   return 0;
