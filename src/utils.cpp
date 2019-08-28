@@ -1,4 +1,4 @@
-#include "itertools/itertools.hpp"
+#include "../external/itertools/src/itertools.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -91,7 +91,7 @@ de_bruijn(int k, int n) -> std::string
     }
   });
   db(1, 1);
-  
+
   return itertools::join(seq, "");
 }
 

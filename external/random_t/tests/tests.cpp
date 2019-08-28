@@ -1,11 +1,10 @@
 #define FMT_HEADER_ONLY
 
-#include "../csv.hpp"
-#include "../cxxopts.hpp"
-#include "../fmt/format.h"
-#include "../tupletools.hpp"
-#include "../utils.cpp"
-#include "random_t.hpp"
+#include "../../cxxopts.hpp"
+#include "../../fmt/format.h"
+#include "../../itertools/src/itertools.hpp"
+#include "../src/random_t.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -35,9 +34,7 @@ rand_loop(Func rng, int N, bool print_loop = false)
   }
   for (auto& [k, v] : uniform_test_dict) {
     double avg = static_cast<double>(v) / N;
-    if (print_loop) {
-      fmt::print("n: {0}, count: {1}, avg: {2}\n", k, v, avg);
-    }
+    if (print_loop) { fmt::print("n: {0}, count: {1}, avg: {2}\n", k, v, avg); }
     avg_total += avg;
     uniform_test_dict[k] = avg;
   }

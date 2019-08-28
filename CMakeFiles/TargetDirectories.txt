@@ -1,3 +1,0 @@
-/Users/mkbabb/Documents/PycharmProjects/erate/CMakeFiles/rebuild_cache.dir
-/Users/mkbabb/Documents/PycharmProjects/erate/CMakeFiles/edit_cache.dir
-/Users/mkbabb/Documents/PycharmProjects/erate/CMakeFiles/erate.dir

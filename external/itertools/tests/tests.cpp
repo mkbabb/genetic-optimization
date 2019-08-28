@@ -1,9 +1,9 @@
 #define FMT_HEADER_ONLY
 
-#include "../fmt/format.h"
-#include "../random_t/random_t.hpp"
-#include "generator.hpp"
-#include "itertools.hpp"
+#include "../../fmt/format.h"
+#include "../../random_t/src/random_t.hpp"
+#include "../src/generator.hpp"
+#include "../src/itertools.hpp"
 
 #include <chrono>
 #include <deque>

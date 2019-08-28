@@ -1,10 +1,10 @@
 #define FMT_HEADER_ONLY
 
-#include "csv.hpp"
-#include "cxxopts.hpp"
-#include "fmt/format.h"
-#include "itertools/itertools.hpp"
-#include "random_t/random_t.hpp"
+#include "../external/csv.hpp"
+#include "../external/cxxopts.hpp"
+#include "../external/fmt/format.h"
+#include "../external/itertools/src/itertools.hpp"
+#include "../external/random_t/src/random_t.hpp"
 #include "utils.cpp"
 
 #include <algorithm>
@@ -307,22 +307,27 @@ optimize_buckets(std::vector<erate_t>& erate_data,
   auto& max_critter = critters[0];
 
   for (auto i : itertools::range(iterations)) {
-    max_critter = calc_pool_fitness(
-      erate_data, buckets, critters, max_critter, max_bucket, rng);
+    max_critter = calc_pool_fitness(erate_data,
+                                    buckets,
+                                    critters,
+                                    max_critter,
+                                    max_bucket,
+                                    rng);
 
     if (max_fitness < max_critter.fitness()) {
       std::ofstream ofs;
       ofs.open(out_file, std::ios::trunc);
-      std::string header =
-        fmt::format("\niteration: {0}, discount-total: {1:.2f}\n"
-                    "max-delta: {2:.2f}, prev-max-delta: {3:.2f}\n"
-                    "iteration-delta: {4}, rng-state: {5}",
-                    i,
-                    max_fitness,
-                    max_fitness - MAX_2019,
-                    max_fitness - max_critter.fitness(),
-                    i,
-                    rng.state());
+      std::string header = fmt::format("\niteration: {0}, discount-total: "
+                                       "{1:.2f}\n"
+                                       "max-delta: {2:.2f}, prev-max-delta: "
+                                       "{3:.2f}\n"
+                                       "iteration-delta: {4}, rng-state: {5}",
+                                       i,
+                                       max_fitness,
+                                       max_fitness - MAX_2019,
+                                       max_fitness - max_critter.fitness(),
+                                       i,
+                                       rng.state());
 
       max_fitness = max_critter.fitness();
 
@@ -346,15 +351,15 @@ optimize_buckets(std::vector<erate_t>& erate_data,
       ofs.close();
     }
 
-    cull_mating_pool(
-      erate_data,
-      critters,
-      bucket_count,
-      max_critter.fitness(), // Potentially change this to max_fitness
-      mutation_count,
-      parent_count,
-      mating_pool_count,
-      rng);
+    cull_mating_pool(erate_data,
+                     critters,
+                     bucket_count,
+                     max_critter
+                       .fitness(), // Potentially change this to  max_fitness
+                     mutation_count,
+                     parent_count,
+                     mating_pool_count,
+                     rng);
   }
 }
 
@@ -387,35 +392,42 @@ main(int argc, char** argv)
   Argument parsing of argv.
    */
   cxxopts::Options options("erate", "to optimize data_t");
-  options.allow_unrecognised_options().add_options()(
-    "i,in_file", "Input file", cxxopts::value<std::string>())(
-    "o,out_file", "Output file", cxxopts::value<std::string>())(
-    "bucket_count", "Bucket count", cxxopts::value<int>()->default_value("4"))(
-    "max_bucket",
-    "Max bucket count",
-    cxxopts::value<int>()->default_value("150"))(
-    "population_count",
-    "Population count",
-    cxxopts::value<int>()->default_value("100"))(
-    "mutation_rate",
-    "Mutation rate",
-    cxxopts::value<int>()->default_value("1"))(
-    "mutation_threshold_low",
-    "Mutation threshold low",
-    cxxopts::value<int>()->default_value("100000"))(
-    "mutation_threshold_high",
-    "Mutation threshold high",
-    cxxopts::value<int>()->default_value("1000000"))(
-    "parent_count", "Parent count", cxxopts::value<int>()->default_value("2"))(
-    "mating_pool_count",
-    "Mating pool count",
-    cxxopts::value<int>()->default_value("10"))(
-    "iterations",
-    "Iterations",
-    cxxopts::value<int>()->default_value("1000000"))(
-    "rng_state",
-    "Random number generator state",
-    cxxopts::value<int>()->default_value("-1"));
+  options.allow_unrecognised_options()
+    .add_options()("i,in_file", "Input file", cxxopts::value<std::string>())(
+      "o,out_file",
+      "Output file",
+      cxxopts::value<std::string>())("bucket_count",
+                                     "Bucket count",
+                                     cxxopts::value<int>()->default_value("4"))(
+      "max_bucket",
+      "Max bucket count",
+      cxxopts::value<int>()->default_value(
+        "150"))("population_count",
+                "Population count",
+                cxxopts::value<int>()->default_value(
+                  "100"))("mutation_rate",
+                          "Mutation rate",
+                          cxxopts::value<int>()->default_value(
+                            "1"))("mutation_threshold_low",
+                                  "Mutation threshold low",
+                                  cxxopts::value<int>()->default_value(
+                                    "100000"))("mutation_threshold_high",
+                                               "Mutation threshold high",
+                                               cxxopts::value<int>()
+                                                 ->default_value("1000000"))(
+      "parent_count",
+      "Parent count",
+      cxxopts::value<int>()->default_value(
+        "2"))("mating_pool_count",
+              "Mating pool count",
+              cxxopts::value<int>()->default_value(
+                "10"))("iterations",
+                       "Iterations",
+                       cxxopts::value<int>()->default_value(
+                         "1000000"))("rng_state",
+                                     "Random number generator state",
+                                     cxxopts::value<int>()->default_value(
+                                       "-1"));
 
   auto result = options.parse(argc, argv);
 

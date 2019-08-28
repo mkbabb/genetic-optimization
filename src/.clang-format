@@ -3,6 +3,7 @@ BasedOnStyle: Mozilla
 AlignAfterOpenBracket: Align
 AlignConsecutiveAssignments: 'false'
 AlignConsecutiveDeclarations: 'false'
+AllowAllParametersOfDeclarationOnNextLine: 'false'
 AlignTrailingComments: 'true'
 AllowShortBlocksOnASingleLine: 'true'
 AllowShortCaseLabelsOnASingleLine: 'true'
@@ -17,7 +18,9 @@ BreakBeforeTernaryOperators: 'true'
 ColumnLimit: '80'
 CompactNamespaces: 'true'
 Cpp11BracedListStyle: 'true'
+ExperimentalAutoDetectBinPacking: 'false'
 IncludeBlocks: Regroup
+IndentWidth: 2
 ReflowComments: 'true'
 SortIncludes: 'true'
 SortUsingDeclarations: 'true'
@@ -30,5 +33,9 @@ SpacesInAngles: 'false'
 SpacesInCStyleCastParentheses: 'false'
 SpacesInSquareBrackets: 'false'
 TabWidth: '4'
+
+PenaltyBreakBeforeFirstCallParameter: 1000
+
+
 
 ...
