@@ -3,7 +3,7 @@
 #include "../../cxxopts.hpp"
 #include "../../fmt/format.h"
 #include "../../itertools/src/itertools.hpp"
-#include "../src/random_t.hpp"
+#include "../src/random_v.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -18,7 +18,7 @@
 #include <type_traits>
 #include <vector>
 
-using namespace random_t;
+using namespace random_v;
 
 template<class Func, class Output = typename std::result_of<Func(void)>::type>
 double

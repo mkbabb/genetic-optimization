@@ -9,14 +9,14 @@ PyObject* ErrorObject;
 void
 PyFromList_ToVector(PyObject* list, std::vector<int>& vec)
 {
-  PyObject* list_item;
+    PyObject* list_item;
 
-  int len = PyObject_Length(list);
+    int len = PyObject_Length(list);
 
-  for (int i = 0; i < len; i++) {
-    list_item = PyList_GetItem(list, i);
-    vec.push_back(PyFloat_AsDouble(list_item));
-  }
+    for (int i = 0; i < len; i++) {
+        list_item = PyList_GetItem(list, i);
+        vec.push_back(PyFloat_AsDouble(list_item));
+    }
 }
 
 const char erate_genetic__doc__[] = "";
@@ -24,7 +24,7 @@ const char erate_genetic__doc__[] = "";
 PyObject*
 erate_genetic_impl(PyObject* self, PyObject* args)
 {
-  return (PyObject*) data;
+    return (PyObject*) data;
 }
 
 struct PyMethodDef fpp_methods[] = {{"erate_genetic",
@@ -47,5 +47,5 @@ struct PyModuleDef moduledef = {PyModuleDef_HEAD_INIT,
 PyMODINIT_FUNC
 PyInit_erate_genetic()
 {
-  return PyModule_Create(&moduledef);
+    return PyModule_Create(&moduledef);
 }

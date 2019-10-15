@@ -20,7 +20,7 @@ CompactNamespaces: 'true'
 Cpp11BracedListStyle: 'true'
 ExperimentalAutoDetectBinPacking: 'false'
 IncludeBlocks: Regroup
-IndentWidth: 2
+IndentWidth: 4
 ReflowComments: 'true'
 SortIncludes: 'true'
 SortUsingDeclarations: 'true'

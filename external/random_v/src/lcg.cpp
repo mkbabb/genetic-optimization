@@ -1,6 +1,6 @@
 #include <cstdint>
 
-namespace random_t {
+namespace random_v {
 uint32_t
 lcg_0(uint64_t* state)
 {

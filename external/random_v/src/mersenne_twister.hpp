@@ -6,7 +6,7 @@
 
 #pragma once
 
-namespace random_t {
+namespace random_v {
 
 template<typename CastType = uint32_t>
 class MT19937_N

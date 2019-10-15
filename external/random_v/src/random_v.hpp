@@ -10,7 +10,7 @@
 
 #pragma once
 
-namespace random_t {
+namespace random_v {
 
 template<typename StateType = uint64_t,
          typename OutputType = uint32_t,

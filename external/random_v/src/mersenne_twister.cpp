@@ -1,6 +1,6 @@
 #include "mersenne_twister.hpp"
 
-using namespace random_t;
+using namespace random_v;
 
 template<typename CastType>
 void
