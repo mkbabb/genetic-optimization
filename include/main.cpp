@@ -287,16 +287,21 @@ optimize_buckets(std::vector<erate_t>& data,
         if (critter.fitness() > max_fitness) {
           ofs.open(out_file, std::ios::trunc);
 
-          std::string header =
-            fmt::format("\niteration: {0}, discount-total: {1:.2f}\n"
-                        "max-delta: {2:.2f}, prev-max-delta: {3:.2f}\n"
-                        "iteration-delta: {4}, rng-state: {5}",
-                        i,
-                        critter.fitness(),
-                        critter.fitness() - MAX_2019,
-                        critter.fitness() - max_fitness,
-                        i - mutation_gap,
-                        rng.state());
+          std::string header = fmt::format("{0},{1:.2f},{2:.2f}\n",
+                                           i,
+                                           critter.fitness(),
+                                           critter.fitness() - MAX_2019);
+
+          //   std::string header =
+          //     fmt::format("\niteration: {0}, discount-total: {1:.2f}\n"
+          //                 "max-delta: {2:.2f}, prev-max-delta: {3:.2f}\n"
+          //                 "iteration-delta: {4}, rng-state: {5}",
+          //                 i,
+          //                 critter.fitness(),
+          //                 critter.fitness() - MAX_2019,
+          //                 critter.fitness() - max_fitness,
+          //                 i - mutation_gap,
+          //                 rng.state());
 
           max_fitness = critter.fitness();
           mutation_counter_low = i;

@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.2)
-project(erate VERSION 0.1.0)
+project(erate_analysis VERSION 0.1.0)
 
 
-set(CMAKE_CXX_COMPILER "/usr/local/Cellar/llvm/8.0.0_1/bin/clang++")
+# set(CMAKE_CXX_COMPILER "/usr/local/Cellar/llvm/8.0.0_1/bin/clang++")
 
 set(COMPILE_FLAGS "-stdlib=libc++ -std=c++17 -Ofast")
 # set(LINK_FLAGS "${LINK_FLAGS} -stdlib=libc++")
