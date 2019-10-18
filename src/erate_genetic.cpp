@@ -199,8 +199,8 @@ proportionate_selection(std::vector<Critter>& critters,
 
 template<typename T>
 void
-k_point_crossover(std::vector<Critter>& parents,
-                  std::vector<Critter>& children,
+k_point_crossover(std::vector<Critter*>& parents,
+                  std::vector<Critter*>& children,
                   std::vector<int>& probability_distb,
                   std::vector<int>& ixs,
                   size_t N,
@@ -217,10 +217,10 @@ k_point_crossover(std::vector<Critter>& parents,
     for (auto end : probability_distb) {
         do {
             for (auto [n, j] : itertools::enumerate(ixs)) {
-                std::get<0>(children[j].genes()[start]) =
-                  std::get<0>(parents[n].genes()[start]);
-                std::get<1>(children[j].genes()[start]) =
-                  std::get<1>(parents[n].genes()[start]);
+                std::get<0>(children[j]->genes()[start]) =
+                  std::get<0>(parents[n]->genes()[start]);
+                std::get<1>(children[j]->genes()[start]) =
+                  std::get<1>(parents[n]->genes()[start]);
             }
         } while (start++ < end);
         itertools::roll(ixs);
@@ -230,14 +230,26 @@ k_point_crossover(std::vector<Critter>& parents,
 
 template<typename T>
 void
-cull_mating_pool(std::vector<erate_t>& erate_data,
-                 std::vector<Critter>& critters,
-                 size_t bucket_count,
-                 double max_fitness,
-                 size_t mutation_count,
-                 size_t parent_count,
-                 size_t mating_pool_count,
+cull_mating_pool(std::vector<Critter>& critters,
+                 std::vector<Critter>& children,
                  T& rng)
+{
+    for (auto [n, critter] : itertools::enumerate(critters)) {
+        auto r = rng.randrange(0, children.size());
+        critters[n] = children[r];
+    }
+}
+
+template<typename T>
+void
+mate(std::vector<erate_t>& erate_data,
+     std::vector<Critter>& critters,
+     size_t bucket_count,
+     double max_fitness,
+     size_t mutation_count,
+     size_t parent_count,
+     size_t mating_pool_count,
+     T& rng)
 {
     auto N = erate_data.size();
     auto population_count = critters.size();
@@ -246,24 +258,19 @@ cull_mating_pool(std::vector<erate_t>& erate_data,
       proportionate_selection(critters, max_fitness, mating_pool_count, rng);
     std::vector<Critter> children(parent_count * population_count, {N});
 
-    std::vector<Critter> t_parents(begin(parents),
-                                   begin(parents) + parent_count);
-    std::vector<Critter> t_children(begin(children),
-                                    begin(children) + parent_count);
+    std::vector<Critter*> t_parents(parent_count);
+    std::vector<Critter*> t_children(parent_count);
 
     std::vector<int> probability_distb(parent_count, 0);
     std::vector<int> ixs(parent_count, 0);
-    itertools::for_each(ixs, [](auto n, auto&& i) {
-        i = n;
-        return false;
-    });
+    itertools::for_each(ixs, [](auto n, auto&& i) { i = n; });
 
     auto k = 0;
     for (auto i : itertools::range(population_count)) {
         for (auto j : itertools::range(parent_count)) {
             auto r = rng.randrange(0, mating_pool_count);
-            t_children[j] = children[k++];
-            t_parents[j] = parents[r];
+            t_children[j] = &children[k++];
+            t_parents[j] = &parents[r];
         }
         k_point_crossover(t_parents,
                           t_children,
@@ -272,7 +279,7 @@ cull_mating_pool(std::vector<erate_t>& erate_data,
                           N,
                           rng);
     }
-    critters = std::move(children);
+    cull_mating_pool(critters, children, rng);
 }
 
 void
@@ -360,15 +367,14 @@ optimize_buckets(std::vector<erate_t>& erate_data,
             ofs.close();
         }
 
-        cull_mating_pool(erate_data,
-                         critters,
-                         bucket_count,
-                         max_critter
-                           .fitness(), // Potentially change this to max_fitness
-                         mutation_count,
-                         parent_count,
-                         mating_pool_count,
-                         rng);
+        mate(erate_data,
+             critters,
+             bucket_count,
+             max_critter.fitness(), // Potentially change this to max_fitness
+             mutation_count,
+             parent_count,
+             mating_pool_count,
+             rng);
     }
 }
 
