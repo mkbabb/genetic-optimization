@@ -344,8 +344,14 @@ optimize_buckets(std::vector<erate_t>& erate_data,
     }
     std::vector<Critter> critters(population_count, {N});
     auto max_critter = &critters[0];
+    int t = 0;
+    bool found = false;
 
     for (auto i : itertools::range(iterations)) {
+        if (t > 200) {
+            init = true;
+            t = 0;
+        }
         max_critter = calc_pool_fitness(&init,
                                         erate_data,
                                         buckets,
@@ -356,11 +362,15 @@ optimize_buckets(std::vector<erate_t>& erate_data,
 
         if (max_fitness < max_critter->fitness()) {
             max_fitness = max_critter->fitness();
-            std::cout << fmt::format("i: {} max-fitness: {}, max-delta: {}\n",
-                                     i,
-                                     max_fitness,
-                                     max_fitness - MAX_2019);
+            std::cout
+              << fmt::format("t: {}, i: {}, max-fitness: {}, max-delta: {}\n",
+                             t,
+                             i,
+                             max_fitness,
+                             max_fitness - MAX_2019);
+            t = 0;
         }
+        t++;
 
         mate(buckets,
              erate_data,

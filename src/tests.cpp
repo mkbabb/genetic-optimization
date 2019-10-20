@@ -37,7 +37,7 @@ main()
     int mutation_threshold_high = 0;
    
     int parent_count = 2;
-    int mating_pool_count = 30;
+    int mating_pool_count = 100;
     int iterations = 10'000;
 
     auto erate_data = process_erate_data(in_file);
