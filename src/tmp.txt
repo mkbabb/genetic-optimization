@@ -1,0 +1,35 @@
+std::ofstream ofs;
+            ofs.open(out_file, std::ios::trunc);
+            std::string header =
+              fmt::format("\niteration: {0}, discount-total: "
+                          "{1:.2f}\n"
+                          "max-delta: {2:.2f}, prev-max-delta: "
+                          "{3:.2f}\n"
+                          "iteration-delta: {4}, rng-state: {5}",
+                          i,
+                          max_fitness,
+                          max_fitness - MAX_2019,
+                          max_fitness - max_critter.fitness(),
+                          i,
+                          rng.state());
+
+            max_fitness = max_critter.fitness();
+
+            fmt::print("{0}\n", header);
+            ofs << "lea-number,discount,cost,no-mutate,bucket\n";
+
+            fmt::memory_buffer row;
+            itertools::for_each(max_critter.genes(), [&](auto n, auto i) {
+                fmt::format_to(row,
+                               "{0},{1},{2},{3},{4}\n",
+                               erate_data[n].lea_number,
+                               erate_data[n].discount,
+                               erate_data[n].cost,
+                               std::get<0>(i),
+                               std::get<1>(i));
+                std::get<0>(i) = 1;
+                return false;
+            });
+
+            ofs << row.data();
+            ofs.close();

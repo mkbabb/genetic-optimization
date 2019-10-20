@@ -109,21 +109,25 @@ make_genes(std::vector<erate_t>& erate_data, int bucket_count)
 
 template<typename T>
 auto
-calc_pool_fitness(std::vector<erate_t>& erate_data,
+calc_pool_fitness(bool* init,
+                  std::vector<erate_t>& erate_data,
                   std::map<size_t, std::map<std::string, double>>& buckets,
                   std::vector<Critter>& critters,
-                  Critter& max_critter,
+                  Critter* max_critter,
                   size_t max_bucket,
-                  T& rng) -> Critter&
+                  T& rng) -> Critter*
 
 {
     for (auto& critter : critters) {
         auto fitness = 0.0;
 
         for (auto i : itertools::range(erate_data.size())) {
-            auto j = std::get<0>(critter.genes()[i])
-                       ? std::get<1>(critter.genes()[i])
-                       : rng.randrange(0, buckets.size());
+            // auto j = std::get<0>(critter.genes()[i])
+            //            ? std::get<1>(critter.genes()[i])
+            //            : rng.randrange(0, buckets.size());
+
+            auto j = !(*(init)) ? std::get<1>(critter.genes()[i])
+                                : rng.randrange(0, buckets.size());
 
             while (buckets[j]["count"] >= max_bucket) {
                 j = rng.randrange(0, buckets.size());
@@ -140,11 +144,13 @@ calc_pool_fitness(std::vector<erate_t>& erate_data,
         for (auto& [_, bucket] : buckets) {
             if (bucket["count"] > 0) {
                 bucket["average_discount"] =
-                  double_round((bucket["total_discount"] /
-                                (bucket["count"] * 100)),
-                               3);
+                  double_round(bucket["total_discount"] /
+                                 (bucket["count"] * 100),
+                               3); // maybe change this.
+
                 bucket["discount_cost"] =
                   bucket["average_discount"] * bucket["total_cost"];
+
                 fitness += bucket["discount_cost"];
             }
         }
@@ -152,12 +158,13 @@ calc_pool_fitness(std::vector<erate_t>& erate_data,
         critter.fitness(fitness);
 
         max_critter =
-          critter.fitness() > max_critter.fitness() ? critter : max_critter;
+          critter.fitness() > max_critter->fitness() ? &critter : max_critter;
 
         for (auto& [_, bucket] : buckets) {
             for (auto& [key, value] : bucket) { value = 0; }
         }
     }
+    *init = false;
     return max_critter;
 }
 
@@ -166,11 +173,11 @@ auto
 proportionate_selection(std::vector<Critter>& critters,
                         double max_fitness,
                         size_t mating_pool_count,
-                        T& rng) -> std::vector<Critter>
+                        T& rng) -> std::vector<Critter*>
 {
-    auto divisor = critters.size() * 100;
+    auto divisor = critters.size() * 1000;
     std::map<int, int> probability_dict;
-    std::vector<Critter> parents;
+    std::vector<Critter*> parents(mating_pool_count);
 
     auto total_fitness = 0.0;
     for (auto& critter : critters) {
@@ -189,7 +196,7 @@ proportionate_selection(std::vector<Critter>& critters,
         auto r = rng.randrange(0, divisor);
         for (auto& [key, value] : probability_dict) {
             if (r < value) {
-                parents.push_back(critters[key]);
+                parents[i] = &critters[key];
                 break;
             }
         }
@@ -206,23 +213,24 @@ k_point_crossover(std::vector<Critter*>& parents,
                   size_t N,
                   T& rng)
 {
-    for (auto i : itertools::range(parents.size())) {
+    for (auto i : itertools::range(29)) {
         auto crossover_point = rng.randrange(0, N);
         probability_distb[i] = crossover_point;
     }
-    probability_distb.push_back(N);
+    probability_distb[parents.size()] = N - 1;
     std::sort(begin(probability_distb), end(probability_distb));
 
     auto start = 0;
     for (auto end : probability_distb) {
-        do {
-            for (auto [n, j] : itertools::enumerate(ixs)) {
-                std::get<0>(children[j]->genes()[start]) =
-                  std::get<0>(parents[n]->genes()[start]);
-                std::get<1>(children[j]->genes()[start]) =
-                  std::get<1>(parents[n]->genes()[start]);
+        for (auto [n, j] : itertools::enumerate(ixs)) {
+            auto k = start;
+            while (k++ < end) {
+                std::get<0>(children[j]->genes()[k]) =
+                  std::get<0>(parents[n]->genes()[k]);
+                std::get<1>(children[j]->genes()[k]) =
+                  std::get<1>(parents[n]->genes()[k]);
             }
-        } while (start++ < end);
+        }
         itertools::roll(ixs);
         start = end;
     }
@@ -242,7 +250,8 @@ cull_mating_pool(std::vector<Critter>& critters,
 
 template<typename T>
 void
-mate(std::vector<erate_t>& erate_data,
+mate(std::map<size_t, std::map<std::string, double>>& buckets,
+     std::vector<erate_t>& erate_data,
      std::vector<Critter>& critters,
      size_t bucket_count,
      double max_fitness,
@@ -254,22 +263,31 @@ mate(std::vector<erate_t>& erate_data,
     auto N = erate_data.size();
     auto population_count = critters.size();
 
-    auto parents =
-      proportionate_selection(critters, max_fitness, mating_pool_count, rng);
+    std::sort(begin(critters), end(critters), [](auto c1, auto c2) {
+        return c1.fitness() > c2.fitness();
+    });
+
+    // auto parents =
+    //   proportionate_selection(critters, max_fitness, mating_pool_count, rng);
+
+    std::vector<Critter> parents(begin(critters),
+                                 begin(critters) + mating_pool_count);
+
     std::vector<Critter> children(parent_count * population_count, {N});
 
     std::vector<Critter*> t_parents(parent_count);
     std::vector<Critter*> t_children(parent_count);
 
-    std::vector<int> probability_distb(parent_count, 0);
+    std::vector<int> probability_distb(30, 0);
+
     std::vector<int> ixs(parent_count, 0);
     itertools::for_each(ixs, [](auto n, auto&& i) { i = n; });
 
-    auto k = 0;
+    auto kk = 0;
     for (auto i : itertools::range(population_count)) {
         for (auto j : itertools::range(parent_count)) {
             auto r = rng.randrange(0, mating_pool_count);
-            t_children[j] = &children[k++];
+            t_children[j] = &children[kk++];
             t_parents[j] = &parents[r];
         }
         k_point_crossover(t_parents,
@@ -278,7 +296,15 @@ mate(std::vector<erate_t>& erate_data,
                           ixs,
                           N,
                           rng);
+        for (auto j : itertools::range(parent_count)) {
+            for (auto k : itertools::range(mutation_count)) {
+                auto r = rng.randrange(0, N);
+                auto& child = children[kk - (j + 1)];
+                std::get<1>(child.genes()[r]) = rng.randrange(0, bucket_count);
+            }
+        }
     }
+
     cull_mating_pool(critters, children, rng);
 }
 
@@ -296,9 +322,8 @@ optimize_buckets(std::vector<erate_t>& erate_data,
                  size_t iterations,
                  uint64_t rng_state)
 {
-    std::ofstream ofs;
-
     auto N = erate_data.size();
+    bool init = true;
 
     auto mutation_count =
       std::min(static_cast<size_t>((N * mutation_rate) / 100.f), N);
@@ -317,60 +342,31 @@ optimize_buckets(std::vector<erate_t>& erate_data,
                                                       {"discount_cost", 0.0},
                                                       {"count", 0.0}});
     }
-    std::vector<Critter> critters(population_count,
-                                  {N, make_genes(erate_data, bucket_count)});
-    auto& max_critter = critters[0];
+    std::vector<Critter> critters(population_count, {N});
+    auto max_critter = &critters[0];
 
     for (auto i : itertools::range(iterations)) {
-        max_critter = calc_pool_fitness(erate_data,
+        max_critter = calc_pool_fitness(&init,
+                                        erate_data,
                                         buckets,
                                         critters,
                                         max_critter,
                                         max_bucket,
                                         rng);
 
-        if (max_fitness < max_critter.fitness()) {
-            std::ofstream ofs;
-            ofs.open(out_file, std::ios::trunc);
-            std::string header =
-              fmt::format("\niteration: {0}, discount-total: "
-                          "{1:.2f}\n"
-                          "max-delta: {2:.2f}, prev-max-delta: "
-                          "{3:.2f}\n"
-                          "iteration-delta: {4}, rng-state: {5}",
-                          i,
-                          max_fitness,
-                          max_fitness - MAX_2019,
-                          max_fitness - max_critter.fitness(),
-                          i,
-                          rng.state());
-
-            max_fitness = max_critter.fitness();
-
-            fmt::print("{0}\n", header);
-            ofs << "lea-number,discount,cost,no-mutate,bucket\n";
-
-            fmt::memory_buffer row;
-            itertools::for_each(max_critter.genes(), [&](auto n, auto i) {
-                fmt::format_to(row,
-                               "{0},{1},{2},{3},{4}\n",
-                               erate_data[n].lea_number,
-                               erate_data[n].discount,
-                               erate_data[n].cost,
-                               std::get<0>(i),
-                               std::get<1>(i));
-                std::get<0>(i) = 1;
-                return false;
-            });
-
-            ofs << row.data();
-            ofs.close();
+        if (max_fitness < max_critter->fitness()) {
+            max_fitness = max_critter->fitness();
+            std::cout << fmt::format("i: {} max-fitness: {}, max-delta: {}\n",
+                                     i,
+                                     max_fitness,
+                                     max_fitness - MAX_2019);
         }
 
-        mate(erate_data,
+        mate(buckets,
+             erate_data,
              critters,
              bucket_count,
-             max_critter.fitness(), // Potentially change this to max_fitness
+             max_critter->fitness(), // Potentially change this to max_fitness
              mutation_count,
              parent_count,
              mating_pool_count,
@@ -379,7 +375,8 @@ optimize_buckets(std::vector<erate_t>& erate_data,
 }
 
 auto
-process_erate_data(const std::string& in_file) -> std::vector<erate_t>
+process_erate_data(const std::string& in_file, int count = -1)
+  -> std::vector<erate_t>
 {
     std::vector<erate_t> erate_data;
     std::string lea_number;
@@ -392,80 +389,86 @@ process_erate_data(const std::string& in_file) -> std::vector<erate_t>
                    "cost",
                    "no-mutate",
                    "bucket");
-    while (in.read_row(lea_number, discount, cost, no_mutate, bucket)) {
+
+    count = count == -1 ? 0 : count;
+
+    while (in.read_row(lea_number, discount, cost, no_mutate, bucket) &&
+           (--count) != 0) {
         erate_data.push_back(
           erate_t{lea_number, discount, cost, no_mutate, bucket});
     }
     return erate_data;
 }
 
-int
-main(int argc, char** argv)
-{
-    using namespace std::chrono;
-    /*
-    Argument parsing of argv.
-     */
-    cxxopts::Options options("erate", "to optimize data_t");
-    options.allow_unrecognised_options()
-      .add_options()("i,in_file", "Input file", cxxopts::value<std::string>())(
-        "o,out_file",
-        "Output file",
-        cxxopts::value<std::string>())("bucket_count",
-                                       "Bucket count",
-                                       cxxopts::value<int>()->default_value(
-                                         "4"))("max_bucket",
-                                               "Max bucket count",
-                                               cxxopts::value<int>()
-                                                 ->default_value("150"))(
-        "population_count",
-        "Population count",
-        cxxopts::value<int>()->default_value(
-          "100"))("mutation_rate",
-                  "Mutation rate",
-                  cxxopts::value<int>()->default_value(
-                    "1"))("mutation_threshold_low",
-                          "Mutation threshold low",
-                          cxxopts::value<int>()->default_value(
-                            "100000"))("mutation_threshold_high",
-                                       "Mutation threshold high",
-                                       cxxopts::value<int>()->default_value(
-                                         "1000000"))(
-        "parent_count",
-        "Parent count",
-        cxxopts::value<int>()->default_value(
-          "2"))("mating_pool_count",
-                "Mating pool count",
-                cxxopts::value<int>()->default_value(
-                  "10"))("iterations",
-                         "Iterations",
-                         cxxopts::value<int>()->default_value(
-                           "1000000"))("rng_state",
-                                       "Random number generator state",
-                                       cxxopts::value<int>()->default_value(
-                                         "-1"));
+// int
+// main(int argc, char** argv)
+// {
+//     using namespace std::chrono;
+//     /*
+//     Argument parsing of argv.
+//      */
+//     cxxopts::Options options("erate", "to optimize data_t");
+//     options.allow_unrecognised_options()
+//       .add_options()("i,in_file", "Input file",
+//       cxxopts::value<std::string>())(
+//         "o,out_file",
+//         "Output file",
+//         cxxopts::value<std::string>())("bucket_count",
+//                                        "Bucket count",
+//                                        cxxopts::value<int>()->default_value(
+//                                          "4"))("max_bucket",
+//                                                "Max bucket count",
+//                                                cxxopts::value<int>()
+//                                                  ->default_value("150"))(
+//         "population_count",
+//         "Population count",
+//         cxxopts::value<int>()->default_value(
+//           "100"))("mutation_rate",
+//                   "Mutation rate",
+//                   cxxopts::value<int>()->default_value(
+//                     "1"))("mutation_threshold_low",
+//                           "Mutation threshold low",
+//                           cxxopts::value<int>()->default_value(
+//                             "100000"))("mutation_threshold_high",
+//                                        "Mutation threshold high",
+//                                        cxxopts::value<int>()->default_value(
+//                                          "1000000"))(
+//         "parent_count",
+//         "Parent count",
+//         cxxopts::value<int>()->default_value(
+//           "2"))("mating_pool_count",
+//                 "Mating pool count",
+//                 cxxopts::value<int>()->default_value(
+//                   "10"))("iterations",
+//                          "Iterations",
+//                          cxxopts::value<int>()->default_value(
+//                            "1000000"))("rng_state",
+//                                        "Random number generator state",
+//                                        cxxopts::value<int>()->default_value(
+//                                          "-1"));
 
-    auto result = options.parse(argc, argv);
+//     auto result = options.parse(argc, argv);
 
-    auto erate_data = process_erate_data(result["in_file"].as<std::string>());
+//     auto erate_data =
+//     process_erate_data(result["in_file"].as<std::string>());
 
-    auto epoch_time_us =
-      duration_cast<microseconds>(system_clock::now().time_since_epoch());
+//     auto epoch_time_us =
+//       duration_cast<microseconds>(system_clock::now().time_since_epoch());
 
-    auto _rng_state = result["rng_state"].as<int>();
-    auto rng_state = _rng_state > 0 ? static_cast<uint64_t>(_rng_state)
-                                    : epoch_time_us.count();
+//     auto _rng_state = result["rng_state"].as<int>();
+//     auto rng_state = _rng_state > 0 ? static_cast<uint64_t>(_rng_state)
+//                                     : epoch_time_us.count();
 
-    optimize_buckets(erate_data,
-                     result["out_file"].as<std::string>(),
-                     result["bucket_count"].as<int>(),
-                     result["max_bucket"].as<int>(),
-                     result["population_count"].as<int>(),
-                     result["mutation_rate"].as<int>(),
-                     result["mutation_threshold_low"].as<int>(),
-                     result["mutation_threshold_high"].as<int>(),
-                     result["parent_count"].as<int>(),
-                     result["mating_pool_count"].as<int>(),
-                     result["iterations"].as<int>(),
-                     rng_state);
-}
+//     optimize_buckets(erate_data,
+//                      result["out_file"].as<std::string>(),
+//                      result["bucket_count"].as<int>(),
+//                      result["max_bucket"].as<int>(),
+//                      result["population_count"].as<int>(),
+//                      result["mutation_rate"].as<int>(),
+//                      result["mutation_threshold_low"].as<int>(),
+//                      result["mutation_threshold_high"].as<int>(),
+//                      result["parent_count"].as<int>(),
+//                      result["mating_pool_count"].as<int>(),
+//                      result["iterations"].as<int>(),
+//                      rng_state);
+// }
