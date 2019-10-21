@@ -63,32 +63,37 @@ main(int argc, char** argv)
     //      */
     cxxopts::Options options("erate", "to optimize data_t");
     options.allow_unrecognised_options()
-      .add_options()("i,in_file", "Input file", cxxopts::value<std::string>())(
-        "o,out_file",
-        "Output file",
-        cxxopts::value<std::string>())("bucket_count",
-                                       "Bucket count",
-                                       cxxopts::value<int>()->default_value(
-                                         "4"))("max_bucket",
-                                               "Max bucket count",
-                                               cxxopts::value<int>()
-                                                 ->default_value("150"))(
-        "population_count",
-        "Population count",
+      .add_options()("i,in_file",
+                     "Input file",
+                     cxxopts::value<std::string>())("o,out_file",
+                                                    "Output file",
+                                                    cxxopts::value<
+                                                      std::string>())(
+        "load_file",
+        "Load file",
+        cxxopts::value<std::string>()->default_value(
+          ""))("bucket_count",
+               "Bucket count",
+               cxxopts::value<int>()->default_value(
+                 "4"))("max_bucket",
+                       "Max bucket count",
+                       cxxopts::value<int>()->default_value(
+                         "150"))("population_count",
+                                 "Population count",
+                                 cxxopts::value<int>()->default_value("100"))(
+        "mutation_rate",
+        "Mutation rate",
         cxxopts::value<int>()->default_value(
-          "100"))("mutation_rate",
-                  "Mutation rate",
-                  cxxopts::value<int>()->default_value(
-                    "1"))("mutation_threshold_low",
-                          "Mutation threshold low",
-                          cxxopts::value<int>()->default_value(
-                            "100000"))("mutation_threshold_high",
-                                       "Mutation threshold high",
-                                       cxxopts::value<int>()->default_value(
-                                         "1000000"))("parent_count",
-                                                     "Parent count",
-                                                     cxxopts::value<int>()
-                                                       ->default_value("2"))(
+          "1"))("mutation_threshold_low",
+                "Mutation threshold low",
+                cxxopts::value<int>()->default_value(
+                  "100000"))("mutation_threshold_high",
+                             "Mutation threshold high",
+                             cxxopts::value<int>()->default_value(
+                               "1000000"))("parent_count",
+                                           "Parent count",
+                                           cxxopts::value<int>()->default_value(
+                                             "2"))(
         "crossover_count",
         "Crossover count",
         cxxopts::value<int>()->default_value(
@@ -116,6 +121,7 @@ main(int argc, char** argv)
 
     optimize_buckets(erate_data,
                      result["out_file"].as<std::string>(),
+                     result["load_file"].as<std::string>(),
                      result["bucket_count"].as<int>(),
                      result["max_bucket"].as<int>(),
                      result["population_count"].as<int>(),

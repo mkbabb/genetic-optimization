@@ -88,23 +88,50 @@ class Critter
     }
 };
 
+template<typename T>
 auto
-make_genes(std::vector<erate_t>& erate_data, int bucket_count)
+make_genes(std::vector<erate_t>& erate_data, int bucket_count, T& rng)
   -> std::vector<std::tuple<int, int>>
 {
     std::vector<std::tuple<int, int>> genes;
     genes.reserve(erate_data.size());
-
+    int n = 0;
     for (auto d : erate_data) {
-        std::tuple<int, int> tup;
-        if (d.no_mutate) {
-            tup = std::make_tuple(d.no_mutate, d.bucket);
+        if (n < erate_data.size() / 2) {
+            auto tup = std::make_tuple(d.no_mutate, d.bucket);
+            genes.push_back(tup);
         } else {
-            tup = std::make_tuple(0, 0);
+            auto r = rng.randrange(0, bucket_count);
+            auto tup = std::make_tuple(0, r);
+            genes.push_back(tup);
         }
-        genes.push_back(tup);
     }
     return genes;
+}
+
+auto
+process_erate_data(std::string in_file, int count = -1) -> std::vector<erate_t>
+{
+    std::vector<erate_t> erate_data;
+    std::string lea_number;
+    int discount, cost, no_mutate, bucket;
+
+    io::CSVReader<5> in(in_file);
+    in.read_header(io::ignore_extra_column,
+                   "lea-number",
+                   "discount",
+                   "cost",
+                   "no-mutate",
+                   "bucket");
+
+    count = count == -1 ? 0 : count;
+
+    while (in.read_row(lea_number, discount, cost, no_mutate, bucket) &&
+           (--count) != 0) {
+        erate_data.push_back(
+          erate_t{lea_number, discount, cost, no_mutate, bucket});
+    }
+    return erate_data;
 }
 
 template<typename T>
@@ -143,7 +170,7 @@ calc_pool_fitness(std::vector<erate_t>& erate_data,
                 bucket["average_discount"] =
                   double_round(bucket["total_discount"] /
                                  (bucket["count"] * 100),
-                               2); // maybe change this.
+                               3); // maybe change this.
 
                 bucket["discount_cost"] =
                   bucket["average_discount"] * bucket["total_cost"];
@@ -339,6 +366,7 @@ mate(std::vector<erate_t>& erate_data,
 void
 optimize_buckets(std::vector<erate_t>& erate_data,
                  std::string out_file,
+                 std::string load_file,
                  size_t bucket_count,
                  size_t max_bucket,
                  size_t population_count,
@@ -355,13 +383,24 @@ optimize_buckets(std::vector<erate_t>& erate_data,
     auto N = erate_data.size();
     bool randomize = true;
 
+    std::vector<Critter> critters(population_count, {N});
+    random_v::Random rng(rng_state, random_v::lcg_xor_rot);
+
+    if (load_file != "") {
+        randomize = false;
+        auto t_erate_data = process_erate_data(load_file);
+        auto genes = make_genes(t_erate_data, bucket_count, rng);
+        for (auto& critter : critters) { critter.genes(genes); }
+    }
+
     auto mutation_count =
       std::min(static_cast<size_t>((N * mutation_rate) / 100.f), N);
     mating_pool_count = std::min(mating_pool_count, N);
+    parent_count = std::min(parent_count, mating_pool_count);
     max_bucket = std::min(N, max_bucket);
-    auto max_fitness = 0.0;
+    crossover_count = std::max(parent_count + 1, crossover_count);
 
-    random_v::Random rng(rng_state, random_v::lcg_xor_rot);
+    auto max_fitness = 0.0;
 
     std::map<size_t, std::map<std::string, double>> buckets;
     for (auto i : itertools::range(bucket_count)) {
@@ -372,7 +411,7 @@ optimize_buckets(std::vector<erate_t>& erate_data,
                                                       {"discount_cost", 0.0},
                                                       {"count", 0.0}});
     }
-    std::vector<Critter> critters(population_count, {N});
+
     auto max_critter = &critters[0];
 
     std::vector<size_t> parent_ixs(parent_count, 0);
@@ -440,32 +479,6 @@ optimize_buckets(std::vector<erate_t>& erate_data,
              mating_pool_count,
              rng);
     }
-}
-
-auto
-process_erate_data(const std::string& in_file, int count = -1)
-  -> std::vector<erate_t>
-{
-    std::vector<erate_t> erate_data;
-    std::string lea_number;
-    int discount, cost, no_mutate, bucket;
-
-    io::CSVReader<5> in(in_file);
-    in.read_header(io::ignore_extra_column,
-                   "lea-number",
-                   "discount",
-                   "cost",
-                   "no-mutate",
-                   "bucket");
-
-    count = count == -1 ? 0 : count;
-
-    while (in.read_row(lea_number, discount, cost, no_mutate, bucket) &&
-           (--count) != 0) {
-        erate_data.push_back(
-          erate_t{lea_number, discount, cost, no_mutate, bucket});
-    }
-    return erate_data;
 }
 
 // int
