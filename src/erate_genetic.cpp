@@ -148,39 +148,41 @@ calc_pool_fitness(std::vector<erate_t>& erate_data,
     for (auto& critter : critters) {
         auto fitness = 0.0;
 
-        for (auto i : itertools::range(erate_data.size())) {
-            auto j = !(*(randomize)) ? std::get<1>(critter.genes()[i])
-                                     : rng.randrange(0, buckets.size());
+        if (critter.skip() && !(*(randomize))) {
+            fitness = critter.fitness();
+        } else {
+            for (auto i : itertools::range(erate_data.size())) {
+                auto j = !(*(randomize)) ? std::get<1>(critter.genes()[i])
+                                         : rng.randrange(0, buckets.size());
 
-            while (buckets[j]["count"] >= max_bucket) {
-                j = rng.randrange(0, buckets.size());
+                while (buckets[j]["count"] >= max_bucket) {
+                    j = rng.randrange(0, buckets.size());
+                }
+
+                auto& bucket = buckets[j];
+
+                bucket["total_cost"] += erate_data[i].cost;
+                bucket["total_discount"] += erate_data[i].discount;
+                bucket["count"]++;
+
+                std::get<1>(critter.genes()[i]) = j;
             }
 
-            auto& bucket = buckets[j];
+            for (auto& [_, bucket] : buckets) {
+                if (bucket["count"] > 0) {
+                    bucket["average_discount"] =
+                      double_round(bucket["total_discount"] /
+                                     (bucket["count"] * 100),
+                                   2); // maybe change this.
+                    bucket["discount_cost"] =
+                      bucket["average_discount"] * bucket["total_cost"];
 
-            bucket["total_cost"] += erate_data[i].cost;
-            bucket["total_discount"] += erate_data[i].discount;
-            bucket["count"]++;
-
-            std::get<1>(critter.genes()[i]) = j;
-        }
-
-        for (auto& [_, bucket] : buckets) {
-            if (bucket["count"] > 0) {
-                bucket["average_discount"] =
-                  double_round(bucket["total_discount"] /
-                                 (bucket["count"] * 100),
-                               3); // maybe change this.
-
-                bucket["discount_cost"] =
-                  bucket["average_discount"] * bucket["total_cost"];
-
-                fitness += bucket["discount_cost"];
+                    fitness += bucket["discount_cost"];
+                }
             }
+            critter.fitness(fitness);
         }
-
-        critter.fitness(fitness);
-
+        critter.skip(false);
         max_critter =
           critter.fitness() > max_critter->fitness() ? &critter : max_critter;
 
@@ -197,7 +199,7 @@ auto
 proportionate_selection(std::vector<Critter>& critters,
                         double max_fitness,
                         size_t mating_pool_count,
-                        T& rng) -> std::vector<Critter*>
+                        T& rng)
 {
     std::map<int, double> probability_dict;
     std::vector<Critter*> parents(mating_pool_count);
@@ -218,16 +220,7 @@ proportionate_selection(std::vector<Critter>& critters,
         n++;
     }
 
-    for (auto i : itertools::range(mating_pool_count)) {
-        auto r = rng.unit();
-        for (auto [key, value] : probability_dict) {
-            if (r < value) {
-                parents[i] = &critters[key];
-                break;
-            }
-        }
-    }
-    return parents;
+    return probability_dict;
 }
 
 template<typename T>
@@ -268,6 +261,19 @@ k_point_crossover(std::vector<Critter*>& parents,
 
 template<typename T>
 void
+get_critter_subset(std::vector<Critter>& critters,
+                   std::vector<Critter*>& subset,
+                   size_t count,
+                   T& rng)
+{
+    for (auto i : itertools::range(count)) {
+        auto r = rng.randrange(0, critters.size());
+        subset[i] = &critters[r];
+    }
+}
+
+template<typename T>
+void
 mutate_critters(std::vector<Critter*>& critters,
                 size_t bucket_count,
                 size_t mutation_count,
@@ -291,7 +297,8 @@ cull_mating_pool(std::vector<Critter>& critters,
     int n = 0;
     for (auto& critter : critters) {
         auto r = rng.randrange(0, children.size());
-        critters[n] = children[r];
+        critters[n] = children[n];
+        critters[n].skip(true);
         n++;
     }
 }
@@ -319,11 +326,11 @@ mate(std::vector<erate_t>& erate_data,
         return c1.fitness() > c2.fitness();
     });
 
-    // auto parents =
-    //   proportionate_selection(critters, max_fitness, mating_pool_count, rng);
+    auto probability_dict =
+      proportionate_selection(critters, max_fitness, mating_pool_count, rng);
 
-    std::vector<Critter> parents(begin(critters),
-                                 begin(critters) + mating_pool_count);
+    // std::vector<Critter> parents(begin(critters),
+    //                              begin(critters) + mating_pool_count);
 
     std::vector<Critter> children(parent_count * population_count, {N});
 
@@ -333,9 +340,15 @@ mate(std::vector<erate_t>& erate_data,
     auto k = 0;
     for (auto i : itertools::range(population_count)) {
         for (auto j : itertools::range(parent_count)) {
-            auto r = rng.randrange(0, mating_pool_count);
             t_children[j] = &children[k];
-            t_parents[j] = &parents[r];
+
+            auto r = rng.unit();
+            for (auto [key, value] : probability_dict) {
+                if (r < value) {
+                    t_parents[j] = &critters[key];
+                    break;
+                }
+            }
             k++;
         }
         k_point_crossover(t_parents,
@@ -348,18 +361,18 @@ mate(std::vector<erate_t>& erate_data,
 
         mutate_critters(t_children, bucket_count, mutation_count, N, rng);
     }
-    // bool randomize = false;
-    // calc_pool_fitness(erate_data,
-    //                   buckets,
-    //                   children,
-    //                   &children[0],
-    //                   max_bucket,
-    //                   &randomize,
-    //                   rng);
+    bool randomize = false;
+    calc_pool_fitness(erate_data,
+                      buckets,
+                      children,
+                      &children[0],
+                      max_bucket,
+                      &randomize,
+                      rng);
 
-    // std::sort(begin(children), end(children), [](auto c1, auto c2) {
-    //     return c1.fitness() > c2.fitness();
-    // });
+    std::sort(begin(children), end(children), [](auto c1, auto c2) {
+        return c1.fitness() > c2.fitness();
+    });
     cull_mating_pool(critters, children, rng);
 }
 
@@ -384,6 +397,8 @@ optimize_buckets(std::vector<erate_t>& erate_data,
     bool randomize = true;
 
     std::vector<Critter> critters(population_count, {N});
+    std::vector<Critter*> critter_subset(mating_pool_count);
+
     random_v::Random rng(rng_state, random_v::lcg_xor_rot);
 
     if (load_file != "") {
@@ -411,7 +426,6 @@ optimize_buckets(std::vector<erate_t>& erate_data,
                                                       {"discount_cost", 0.0},
                                                       {"count", 0.0}});
     }
-
     auto max_critter = &critters[0];
 
     std::vector<size_t> parent_ixs(parent_count, 0);
@@ -422,7 +436,15 @@ optimize_buckets(std::vector<erate_t>& erate_data,
 
     for (auto i : itertools::range(iterations)) {
         if (max_gap > mutation_threshold_low) {
-            randomize = true;
+            get_critter_subset(critters,
+                               critter_subset,
+                               critter_subset.size(),
+                               rng);
+            mutate_critters(critter_subset,
+                            bucket_count,
+                            mutation_count,
+                            N,
+                            rng);
             max_gap = 0;
         }
         max_critter = calc_pool_fitness(erate_data,
