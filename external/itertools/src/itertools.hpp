@@ -628,7 +628,7 @@ for_each(Iterable&& iter, BinaryFunction&& func)
 {
     for (auto [n, i] : enumerate(iter)) {
         std::invoke(std::forward<BinaryFunction>(func),
-                    std::forward<size_t>(n),
+                    std::forward<decltype(n)>(n),
                     std::forward<decltype(i)>(i));
     }
     return iter;
@@ -653,6 +653,17 @@ sum(Iterable&& iter)
                                              0,
                                              [](auto n, auto v, auto i) {
                                                  return i + v;
+                                             });
+}
+
+template<typename ReductionValue, class Iterable>
+constexpr ReductionValue
+mul(Iterable&& iter)
+{
+    return itertools::reduce<ReductionValue>(iter,
+                                             1,
+                                             [](auto n, auto v, auto i) {
+                                                 return i * v;
                                              });
 }
 
