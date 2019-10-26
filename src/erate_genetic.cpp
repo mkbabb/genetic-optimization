@@ -35,7 +35,7 @@ struct erate_t
 class Critter
 {
   public:
-    std::vector<std::tuple<int, int>> _genes;
+    std::vector<int> _genes;
     double _fitness;
     bool _skip;
 
@@ -44,10 +44,10 @@ class Critter
       , _skip(false)
     {
         _genes.resize(N);
-        std::fill(begin(_genes), end(_genes), std::forward_as_tuple(0, 0));
+        std::fill(begin(_genes), end(_genes), 0);
     }
 
-    Critter(size_t N, std::vector<std::tuple<int, int>>&& g)
+    Critter(size_t N, std::vector<int>&& g)
       : _fitness(0)
       , _skip(false)
     {
@@ -55,12 +55,9 @@ class Critter
         this->genes(g);
     }
 
-    auto genes() -> std::vector<std::tuple<int, int>>& { return _genes; }
-    auto genes() const -> const std::vector<std::tuple<int, int>>
-    {
-        return _genes;
-    }
-    void genes(const std::vector<std::tuple<int, int>>& g)
+    auto genes() -> std::vector<int>& { return _genes; }
+    auto genes() const -> const std::vector<int> { return _genes; }
+    void genes(const std::vector<int>& g)
     {
         std::copy(begin(g), end(g), begin(_genes));
     }
@@ -72,40 +69,17 @@ class Critter
     bool skip() { return _skip; }
     bool skip() const { return _skip; }
     void skip(bool s) { _skip = s; }
-
-    friend std::ostream& operator<<(std::ostream& os, Critter const& data)
-    {
-        fmt::memory_buffer c;
-        fmt::format_to(c,
-                       "{{\nfitness: {0},\nskip: {1},\ngenes:\n\t[",
-                       data.fitness(),
-                       data.skip());
-        for (auto& [g1, g2] : data.genes()) {
-            fmt::format_to(c, "\n\t\t[{0}, {1}]", g1, g2);
-        }
-        fmt::format_to(c, "\n\t]\n}}");
-        os << c.data();
-        return os;
-    }
 };
 
 template<typename T>
 auto
 make_genes(std::vector<erate_t>& erate_data, int bucket_count, T& rng)
-  -> std::vector<std::tuple<int, int>>
+  -> std::vector<int>
 {
-    std::vector<std::tuple<int, int>> genes;
-    genes.reserve(erate_data.size());
-    int n = 0;
-    for (auto d : erate_data) {
-        if (n < erate_data.size() / 2) {
-            auto tup = std::make_tuple(d.no_mutate, d.bucket);
-            genes.push_back(tup);
-        } else {
-            auto r = rng.randrange(0, bucket_count);
-            auto tup = std::make_tuple(0, r);
-            genes.push_back(tup);
-        }
+    std::vector<int> genes(erate_data.size(), 0);
+
+    for (auto [n, d] : itertools::enumerate(erate_data)) {
+        int r = n < erate_data.size() / 2 ? 0 : rng.randrange(0, bucket_count);
     }
     return genes;
 }
@@ -153,7 +127,7 @@ calc_pool_fitness(std::vector<erate_t>& erate_data,
             fitness = critter.fitness();
         } else {
             for (auto i : itertools::range(erate_data.size())) {
-                auto j = !(*(randomize)) ? std::get<1>(critter.genes()[i])
+                auto j = !(*(randomize)) ? critter.genes()[i]
                                          : rng.randrange(0, buckets.size());
 
                 while (buckets[j]["count"] >= max_bucket) {
@@ -166,7 +140,7 @@ calc_pool_fitness(std::vector<erate_t>& erate_data,
                 bucket["total_discount"] += erate_data[i].discount;
                 bucket["count"]++;
 
-                std::get<1>(critter.genes()[i]) = j;
+                critter.genes()[i] = j;
             }
 
             for (auto& [_, bucket] : buckets) {
@@ -207,7 +181,7 @@ proportionate_selection(std::vector<Critter>& critters,
 
     auto total_fitness = 0.0;
     for (auto& critter : critters) {
-        critter.fitness(((critter.fitness() / max_fitness - 0.999) * 1000));
+        critter.fitness(((critter.fitness() / max_fitness - 0.9999) * 10000));
         total_fitness += critter.fitness();
     }
 
@@ -246,10 +220,7 @@ k_point_crossover(std::vector<Critter*>& parents,
         for (auto [n, j] : itertools::enumerate(parent_ixs)) {
             auto k = start;
             while (k++ < end) {
-                std::get<0>(children[j]->genes()[k]) =
-                  std::get<0>(parents[n]->genes()[k]);
-                std::get<1>(children[j]->genes()[k]) =
-                  std::get<1>(parents[n]->genes()[k]);
+                children[j]->genes()[k] = parents[n]->genes()[k];
             }
         }
         itertools::roll(parent_ixs);
@@ -281,20 +252,17 @@ mutate_critters(std::vector<Critter*>& critters,
     for (auto& critter : critters) {
         for (auto i : itertools::range(mutation_count)) {
             auto r = rng.randrange(0, N);
-            std::get<1>(critter->genes()[r]) = rng.randrange(0, bucket_count);
+            auto b = rng.randrange(0, bucket_count);
+            critter->genes()[r] = b;
         }
     }
 }
 
-template<typename T>
 void
-cull_mating_pool(std::vector<Critter>& critters,
-                 std::vector<Critter>& children,
-                 T& rng)
+cull_mating_pool(std::vector<Critter>& critters, std::vector<Critter>& children)
 {
 
     for (auto [n, critter] : itertools::enumerate(critters)) {
-        auto r = rng.randrange(0, children.size());
         critters[n] = children[n];
         critters[n].skip(true);
     }
@@ -319,7 +287,7 @@ mate(std::vector<erate_t>& erate_data,
     auto N = erate_data.size();
     auto population_count = critters.size();
 
-    std::sort(begin(critters), end(critters), [](auto c1, auto c2) {
+    std::sort(begin(critters), end(critters), [](auto& c1, auto& c2) {
         return c1.fitness() > c2.fitness();
     });
 
@@ -364,10 +332,10 @@ mate(std::vector<erate_t>& erate_data,
                       max_bucket,
                       &randomize,
                       rng);
-    std::sort(begin(children), end(children), [](auto c1, auto c2) {
+    std::sort(begin(children), end(children), [](auto& c1, auto& c2) {
         return c1.fitness() > c2.fitness();
     });
-    cull_mating_pool(critters, children, rng);
+    cull_mating_pool(critters, children);
 }
 
 void
@@ -404,6 +372,7 @@ optimize_buckets(std::vector<erate_t>& erate_data,
 
     auto mutation_count =
       std::min(static_cast<size_t>((N * mutation_rate) / 100.f), N);
+
     mating_pool_count = std::min(mating_pool_count, N);
     parent_count = std::min(parent_count, mating_pool_count);
     max_bucket = std::min(N, max_bucket);
@@ -452,29 +421,28 @@ optimize_buckets(std::vector<erate_t>& erate_data,
         if (max_fitness < max_critter->fitness()) {
             ofs.open(out_file, std::ios::trunc);
 
-            max_fitness = max_critter->fitness();
-            std::cout << fmt::
-                format("max-gap: {}, i: {}, max-fitness: {}, max-delta: {}\n",
-                       max_gap,
-                       i,
-                       max_fitness,
-                       max_fitness - MAX_2019);
+            std::cout << fmt::format("max-gap: {}, i: {}, max-fitness: {}, "
+                                     "max-delta: {}, total-savings: {}\n",
+                                     max_gap,
+                                     i,
+                                     max_critter->fitness(),
+                                     max_critter->fitness() - max_fitness,
+                                     max_critter->fitness() - MAX_2019);
             max_gap = 0;
+            max_fitness = max_critter->fitness();
 
             ofs << "lea-number,discount,cost,no-mutate,bucket\n";
 
             fmt::memory_buffer row;
-            int n = 0;
-            for (auto& i : max_critter->genes()) {
+
+            for (auto [n, i] : itertools::enumerate(max_critter->genes())) {
                 fmt::format_to(row,
                                "{0},{1},{2},{3},{4}\n",
                                erate_data[n].lea_number,
                                erate_data[n].discount,
                                erate_data[n].cost,
-                               std::get<0>(i),
-                               std::get<1>(i));
-                std::get<0>(i) = 1;
-                n++;
+                               0,
+                               i);
             }
             ofs << row.data();
             ofs.close();
