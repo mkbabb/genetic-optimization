@@ -133,7 +133,7 @@ constexpr auto
 deref_fwd_const(Tup&& tup)
 {
     return index_apply<N>([&tup](auto... Ixs) {
-        return std::forward_as_tuple(*std::get<Ixs>(tup)...);
+        return std::forward_as_tuple(*(std::get<Ixs>(tup))...);
     });
 }
 
@@ -160,7 +160,7 @@ constexpr auto
 increment_ref(Tup&& tup)
 {
     return tupletools::for_each(std::forward<Tup>(tup),
-                                [](auto&& n, auto&& v) { ++v; });
+                                [](auto n, auto& v) { ++v; });
 }
 
 template<class Pred,
@@ -412,35 +412,33 @@ class zip_iterator
 {
   public:
     using iterator_category = std::forward_iterator_tag;
-    using value_type = std::tuple<Args*...>;
     using pointer_type = std::tuple<Args...>;
-    using reference_type = std::tuple<Args&...>;
 
     explicit constexpr zip_iterator(Args&&... args) noexcept
-      : _args(std::forward<Args>(args)...)
+      : _args(args...)
     {}
 
-    constexpr auto& operator++()
+    constexpr auto operator++()
     {
-        increment_ref(std::forward<pointer_type>(_args));
+        increment_ref(_args);
         return *this;
     }
 
     template<typename T>
-    constexpr bool operator==(T&& rhs)
+    constexpr bool operator==(T& rhs)
     {
-        return any_where([](auto&& x, auto&& y) { return x == y; },
-                         std::forward<pointer_type>(_args),
-                         std::forward<decltype(rhs._args)>(rhs._args));
+        return any_where([](auto& x, auto& y) { return x == y; },
+                         _args,
+                         rhs._args);
     }
     template<typename T>
-    constexpr bool operator!=(T&& rhs)
+    constexpr bool operator!=(T& rhs)
     {
         return !(*this == rhs);
     }
 
-    constexpr auto operator*() const noexcept { return deref_fwd_const(_args); }
-    constexpr auto operator-> () const noexcept { return _args; }
+    constexpr auto operator*() noexcept { return deref_fwd_volatile(_args); }
+    constexpr auto operator-> () noexcept { return _args; }
 
     std::tuple<Args...> _args;
 };
@@ -452,13 +450,12 @@ class [[nodiscard]] zip_impl
     static_assert(N > 0, "!");
 
   public:
-    using it_begin =
-      zip_iterator<decltype(std::begin(std::declval<Args&>()))...>;
-    using it_end = zip_iterator<decltype(std::end(std::declval<Args&>()))...>;
+    using it_begin = zip_iterator<decltype(std::declval<Args>().begin())...>;
+    using it_end = zip_iterator<decltype(std::declval<Args>().end())...>;
 
     explicit constexpr zip_impl(Args && ... args)
-      : _begin(std::forward<decltype(std::begin(args))>(std::begin(args))...)
-      , _end(std::forward<decltype(std::end(args))>(std::end(args))...){};
+      : _begin(args.begin()...)
+      , _end(args.end()...){};
 
     zip_impl& operator=(const zip_impl& rhs) = default;
 
@@ -537,16 +534,12 @@ class range_iterator : public std::iterator<std::forward_iterator_tag, T>
 {
   public:
     using iterator_category = std::forward_iterator_tag;
-    using value_type = T;
-    using difference_type = T;
-    using pointer = T*;
-    using reference = T&;
 
     constexpr explicit range_iterator(range<T>& seq)
       : _seq(seq)
     {}
 
-    constexpr auto& operator++()
+    constexpr auto operator++()
     {
         _seq._current += _seq._stride;
         return *this;
@@ -555,7 +548,7 @@ class range_iterator : public std::iterator<std::forward_iterator_tag, T>
     constexpr bool operator==(T rhs) { return _seq._current == rhs; }
     constexpr bool operator!=(T rhs) { return !(*this == rhs); }
 
-    constexpr T operator*() const { return _seq._current; }
+    constexpr const T& operator*() noexcept { return _seq._current; }
 
   private:
     range<T> _seq;
@@ -594,7 +587,7 @@ class [[nodiscard]] range
     T start() { return _start; }
     T stop() { return _stop; }
     T stride() { return _stride; }
-    T current() { return _current; }
+    T& current() { return _current; }
     size_t size() const { return _size; }
 
     iterator begin() { return iterator(*this); }
@@ -611,8 +604,7 @@ constexpr auto
 enumerate(Iterable&& iter)
 {
     auto _range = range<size_t>(iter.size());
-    return zip(std::forward<decltype(_range)>(_range),
-               std::forward<Iterable>(iter));
+    return zip(_range, std::forward<Iterable>(iter));
 }
 
 /*
