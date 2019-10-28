@@ -23,6 +23,8 @@
 
 constexpr int MAX_2015 = 11'810'384;
 constexpr int MAX_2019 = 15'034'520;
+// constexpr double GAUSSIAN_SQRT2_INV =a
+//   itertools::gaussian(1, itertools::sqrt2, 1, 0, itertools::sqrt2_2, true);
 
 using namespace std::literals;
 
@@ -173,15 +175,13 @@ template<typename T>
 auto
 proportionate_selection(std::vector<Critter>& critters,
                         double max_fitness,
-                        size_t mating_pool_count,
-                        T& rng) -> std::map<int, double>
+                        T& rng)
 {
-    std::map<int, double> probability_dict;
-    std::vector<Critter*> parents(mating_pool_count);
+    std::map<int, int> probability_dict;
 
     auto total_fitness = 0.0;
     for (auto& critter : critters) {
-        critter.fitness(((critter.fitness() / max_fitness - 0.9999) * 10000));
+        critter.fitness(pow((critter.fitness() / max_fitness), 100));
         total_fitness += critter.fitness();
     }
 
@@ -189,7 +189,7 @@ proportionate_selection(std::vector<Critter>& critters,
     auto prev_p = 0.0;
     for (auto [n, critter] : itertools::enumerate(critters)) {
         p = prev_p + (critter.fitness() / total_fitness);
-        probability_dict[n] = p;
+        probability_dict[n] = static_cast<int>(ceil(p * 100'000));
         prev_p = p;
     }
 
@@ -291,8 +291,7 @@ mate(std::vector<erate_t>& erate_data,
         return c1.fitness() > c2.fitness();
     });
 
-    auto probability_dict =
-      proportionate_selection(critters, max_fitness, mating_pool_count, rng);
+    auto probability_dict = proportionate_selection(critters, max_fitness, rng);
 
     std::vector<Critter> children(parent_count * population_count, {N});
 
@@ -305,7 +304,7 @@ mate(std::vector<erate_t>& erate_data,
             t_children[j] = &children[k];
 
             // Actual proportionate selection.
-            auto r = rng.unit();
+            auto r = rng.randrange(0, 100'000);
             for (auto [key, value] : probability_dict) {
                 if (r < value) {
                     t_parents[j] = &critters[key];
@@ -322,7 +321,7 @@ mate(std::vector<erate_t>& erate_data,
                           N,
                           rng);
 
-        mutate_critters(t_children, bucket_count, mutation_count, N, rng);
+        mutate_critters(t_children, bucket_count, 1, N, rng);
     }
     bool randomize = false;
     calc_pool_fitness(erate_data,
@@ -421,13 +420,16 @@ optimize_buckets(std::vector<erate_t>& erate_data,
         if (max_fitness < max_critter->fitness()) {
             ofs.open(out_file, std::ios::trunc);
 
-            std::cout << fmt::format("max-gap: {}, i: {}, max-fitness: {}, "
-                                     "max-delta: {}, total-savings: {}\n",
-                                     max_gap,
-                                     i,
-                                     max_critter->fitness(),
-                                     max_critter->fitness() - max_fitness,
-                                     max_critter->fitness() - MAX_2019);
+            std::cout
+              << fmt::format("i: {0:n}; max-gap: {1:n}; max-fitness: {2:n}; "
+                             "max-delta: {3:n}; total-savings: {4:n}\n",
+                             i,
+                             max_gap,
+                             static_cast<int>(max_critter->fitness()),
+                             static_cast<int>(max_critter->fitness() -
+                                              max_fitness),
+                             static_cast<int>(max_critter->fitness() -
+                                              MAX_2019));
             max_gap = 0;
             max_fitness = max_critter->fitness();
 

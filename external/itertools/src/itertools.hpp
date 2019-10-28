@@ -667,6 +667,43 @@ mul(Iterable&& iter)
                                              });
 }
 
+/**
+ * Performs a linear mapping 'twixt two intervals, [x1, y1] and [x2, y2].
+ * Essentially a linear interpolation of the polynomial y = bx + a, satisfying:
+ *
+ *  a + bx1 = x2
+ *  a + by1 = y2
+ **/
+template<typename T>
+constexpr T
+linear_map(T t, T x1, T y1, T x2, T y2)
+{
+    return (y2 - x2) / (y1 - x1) * t + x2;
+}
+
+constexpr double pi = 3.141592653589793238462643383279502884197169399375;
+constexpr double e = 2.718281828459045235360287471352662497757247093699;
+constexpr double sqrt2 = 1.414213562373095048801688724209698078569671875376;
+constexpr double sqrt2_2 = 0.707106781186547524400844362104849039284835937688;
+constexpr double sqrt_pi = 1.772453850905516027298167483341145182797549456122;
+
+// constexpr double
+// gaussian(double x,
+//          double sigma,
+//          double a = 0,
+//          double b = 0,
+//          double c = 0,
+//          bool inverse = false)
+// {
+//     if (!(a && b && c)) {
+//         a = 1 / (sigma * sqrt2 * sqrt_pi);
+//         b = 0;
+//         c = sigma;
+//     }
+//     double n = inverse ? 1 : -1;
+//     return a * pow(e, n * pow((x - b) / (sqrt2 * c), 2));
+// }
+
 template<class Iterable>
 constexpr Iterable
 swap(Iterable&& iter, int ix1, int ix2)
