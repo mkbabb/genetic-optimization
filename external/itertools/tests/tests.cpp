@@ -4,6 +4,7 @@
 #include "../../random_v/src/random_v.hpp"
 #include "../src/generator.hpp"
 #include "../src/itertools.hpp"
+#include "../src/math.hpp"
 
 #include <chrono>
 #include <deque>
@@ -15,139 +16,6 @@
 #include <numeric>
 #include <string>
 #include <vector>
-
-constexpr double ln2 = 0.693147180559945309417232121458176568075500134360;
-
-constexpr uint64_t POW_2[64] = {9223372036854775808ULL,
-                                4611686018427387904ULL,
-                                2305843009213693952,
-                                1152921504606846976,
-                                576460752303423488,
-                                288230376151711744,
-                                144115188075855872,
-                                72057594037927936,
-                                36028797018963968,
-                                18014398509481984,
-                                9007199254740992,
-                                4503599627370496,
-                                2251799813685248,
-                                1125899906842624,
-                                562949953421312,
-                                281474976710656,
-                                140737488355328,
-                                70368744177664,
-                                35184372088832,
-                                17592186044416,
-                                8796093022208,
-                                4398046511104,
-                                2199023255552,
-                                1099511627776,
-                                549755813888,
-                                274877906944,
-                                137438953472,
-                                68719476736,
-                                34359738368,
-                                17179869184,
-                                8589934592,
-                                4294967296,
-                                2147483648,
-                                1073741824,
-                                536870912,
-                                268435456,
-                                134217728,
-                                67108864,
-                                33554432,
-                                16777216,
-                                8388608,
-                                4194304,
-                                2097152,
-                                1048576,
-                                524288,
-                                262144,
-                                131072,
-                                65536,
-                                32768,
-                                16384,
-                                8192,
-                                4096,
-                                2048,
-                                1024,
-                                512,
-                                256,
-                                128,
-                                64,
-                                32,
-                                16,
-                                8,
-                                4,
-                                2,
-                                1};
-
-constexpr double POW_2_M2[64] =
-  {2.0000000000000000000000000000000000000000000000000000,
-   1.4142135623730950488016887242096980785696718753769481,
-   1.1892071150027210667174999705604759152929720924638174,
-   1.0905077326652576592070106557607079789927027185400671,
-   1.0442737824274138403219664787399290087846031296627133,
-   1.0218971486541166782344801347832994397821404024486081,
-   1.0108892860517004600204097905618605243881376678100500,
-   1.0054299011128028213513839559347998147001084469362532,
-   1.0027112750502024854307455884503620404730044238327597,
-   1.0013547198921082058808815267840949473485306596662412,
-   1.0006771306930663566781727848746471948378219842487377,
-   1.0003385080526823129533054818562164040355585206751763,
-   1.0001692397053022310836407580640735025136671793421835,
-   1.0000846162726943132026333307835912254522374288790575,
-   1.0000423072413958193392519088640529282937840441991927,
-   1.0000211533969648080942498073331996562980602425520876,
-   1.0000105766425497202348486284205645317969471154797808,
-   1.0000052883072917631113668674642409094434692025707413,
-   1.0000026441501501165475027533852261741027395384320666,
-   1.0000013220742011181771202435702836050274107775676828,
-   1.0000006610368820742088289260502489013734510130561973,
-   1.0000003305183864159025349770924440260858530234881598,
-   1.0000001652591795526530542805355470566035368192921809,
-   1.0000000826295863625022559211583769929936630821530130,
-   1.0000000413147923277950954161609490328414942815985912,
-   1.0000000206573959505335439795206440245817777369706170,
-   1.0000000103286979219257716085634456026722759399565052,
-   1.0000000051643489476276357778503882281979962653238039,
-   1.0000000025821744704800053909258459980727063456279533,
-   1.0000000012910872344065495720391466585058062965007660,
-   1.0000000006455436169949115052981368300278162892441468,
-   1.0000000003227718084453649324855227384365830749678693,
-   1.0000000001613859042096597612039766311019850327446120,
-   1.0000000000806929521015742043425548411503818875240791,
-   1.0000000000403464760499731831064518907410942175922039,
-   1.0000000000201732380247831117870236677577797737198673,
-   1.0000000000100866190123406859519617775814176498420247,
-   1.0000000000050433095061576254905934388545557146943583,
-   1.0000000000025216547530756333739498649605164483836141,
-   1.0000000000012608273765370218441382198657274805228419,
-   1.0000000000006304136882683122113599319045010054155322,
-   1.0000000000003152068441341064280026714608185628802044,
-   1.0000000000001576034220670407945820121095086394687000,
-   1.0000000000000788017110335172924361751497738271146855,
-   1.0000000000000394008555167578700043798486723738865748,
-   1.0000000000000197004277583787409487629927863749611140,
-   1.0000000000000098502138791893219610247635062123519534,
-   1.0000000000000049251069395946488521731985314221271933,
-   1.0000000000000024625534697973213940018034602975180717,
-   1.0000000000000012312767348986599389797027787963059885,
-   1.0000000000000006156383674493297799845516515601563991,
-   1.0000000000000003078191837246648426159508913205936341,
-   1.0000000000000001539095918623324094638942120454274986,
-   1.0000000000000000769547959311662017709267976189966476,
-   1.0000000000000000384773979655831001452083217085690768,
-   1.0000000000000000192386989827915498875403915790522302,
-   1.0000000000000000096193494913957748975042534707180385,
-   1.0000000000000000048096747456978874371856411556570002,
-   1.0000000000000000024048373728489437157011991829029953,
-   1.0000000000000000012024186864244718571276942427201215,
-   1.0000000000000000006012093432122359283831207841772167,
-   1.0000000000000000003006046716061179641463788077928973,
-   1.0000000000000000001503023358030589820618940078225209,
-   1.0000000000000000000751511679015294910281231548927785};
 
 // void
 // zip_tests()
@@ -754,168 +622,82 @@ constexpr double POW_2_M2[64] =
 // }
 
 void
-print_pow_2_tables(int n)
+frexp_tests()
 {
-    std::cout << "[";
-    for (auto i : itertools::range(n)) {
-        uint64_t nn = pow(2, 64 - (i + 1));
-        fmt::print("{:d},", nn);
+    random_v::Random rng(0ULL, random_v::lcg_xor_rot, 0);
+    int a = -100'000;
+    int b = 100'000;
+
+    for (double i : itertools::range(100'000)) {
+        double d = static_cast<double>(rng.randrange(a, b)) / 10000.0;
+
+        auto tup0 = frexp0(d);
+        auto tup1 = frexp1(d);
+        auto tup2 = cfrexp(d);
+        auto tup3 = frexp3(d);
+
+        assert(tup0 == tup1);
+        assert(tup0 == tup2);
+        assert(tup0 == tup3);
+
+        // std::cout << itertools::to_string(tup0) << std::endl;
+        // std::cout << itertools::to_string(tup1) << std::endl;
+        // std::cout << itertools::to_string(tup2) << std::endl;
+        // std::cout << itertools::to_string(tup3) << std::endl;
     }
-    std::cout << "]\n";
-    std::cout << "[";
-    for (auto i : itertools::range(n)) {
-        double nn = pow(2, pow(2, -i));
-        fmt::print("{:.52f},", nn);
-    }
-    std::cout << "]\n";
 }
 
-constexpr uint64_t two53 = 9007199254740992 * 2;
-
-constexpr double log2_e = 1.442695040888963407359924681001892137426645954152;
-
-union double_bits
+template<typename T>
+constexpr bool
+assert_almost_equal(T v1, T v2, T epsilon = 1e-12)
 {
-    double dvalue;
-    uint64_t ivalue;
-
-    constexpr double_bits(double d)
-      : dvalue(d){};
-};
-
-union doublebits
-{
-    double d;
-    constexpr doublebits(double dd)
-      : d(dd){};
-    struct
-    {
-
-        uint64_t mant : 52;
-        uint expo : 11;
-        uint sign : 1;
-
-    } parts;
-};
-
-constexpr std::tuple<uint, int, uint64_t>
-myfrexp(double x)
-{
-    uint64_t ivalue = 0;
-
-    double_bits db(x);
-
-    uint sign = db.ivalue >> 63;
-    int exponent = (db.ivalue << 1) >> 53;
-    uint64_t mantissa = db.ivalue & 0xfffffffffffffL;
-
-    if (exponent == 0) {
-        exponent++;
+    auto delta = abs(v1 - v2);
+    if (delta < epsilon) {
+        return true;
     } else {
-        mantissa |= (1L << 52);
+        return false;
     }
-    exponent -= 1022;
-
-    return {sign, exponent, mantissa};
 }
+constexpr uint64_t tenten = 10'000'000'000;
 
-double constexpr myexp(double x)
+void
+exp_tests()
 {
-    bool inverse = false;
-    if (x < 0) {
-        inverse = true;
-        x = -1 * x;
-    }
-    double z = x * log2_e;
+    random_v::Random rng(0ULL, random_v::lcg_xor_rot, 0);
+    int a = -100;
+    int b = 100;
 
-    uint64_t n = z;
+    for (double i : itertools::range(100'000)) {
+        double d = static_cast<double>(rng.randrange(a, b)) / pi;
 
-    double m = z - n;
+        auto v1 = expc(d);
+        auto v2 = exp(d);
 
-    auto [sign, exponent, mantissa] = myfrexp(m);
+        bool b = assert_almost_equal(v1, v2, 1e-4);
 
-    // int exponent;
-    // double mm = frexp(m, &exponent);
-    // uint64_t mantissa = static_cast<uint64_t>(mm * two53);
-
-    double q = 1.0;
-
-    if (n < 64) {
-        q *= POW_2[64 - (n + 1)];
-    } else {
-        return -1;
-    }
-
-    size_t i = 0;
-    size_t high_bit = 0;
-
-    while (i < 64) {
-        if (mantissa & POW_2[i]) {
-            if (!high_bit) {
-                high_bit = i - 1 + exponent;
-            }
-            q *= POW_2_M2[i - high_bit];
+        if (!b) {
+            throw 2;
         }
-        i++;
     }
-
-    return inverse ? 1 / q : q;
 }
 
 void
-frexp_tests(double d)
+pow_tests()
 {
-    {
-        auto [s, e, m] = myfrexp(d);
-        fmt::print("{}, {}\n", e, static_cast<double>(m) / two53);
-    }
+    random_v::Random rng(0ULL, random_v::lcg_xor_rot, 0);
+    int a1 = 1;
+    int b1 = 100;
 
-    {
-        doublebits db(d);
-        fmt::print("{}, {}\n",
-                   ((int) db.parts.expo) - 1022,
-                   static_cast<double>(db.parts.mant) / two53 + 0.5);
-    }
-    {
-        uint64_t ivalue = *((uint64_t*) (&d));
+    int a2 = 1;
+    int b2 = 10;
 
-        double realMant = 1.0;
-        int exponent = (int) ((ivalue >> 52) & 0x7ffL);
-        uint64_t mantissa = ivalue & 0xfffffffffffffL;
+    for (double i : itertools::range(100'000)) {
+        double x = static_cast<double>(rng.randrange(a1, b1)) / pi;
+        double a = static_cast<double>(rng.randrange(a2, b2)) / pi;
 
-        uint64_t m = mantissa;
-
-        if (exponent == 0) {
-            exponent++;
-        } else {
-            mantissa = mantissa | (1L << 52);
-        }
-
-        // bias the exponent - actually biased by 1023.
-        // we are treating the mantissa as m.0 instead of 0.m
-        //  so subtract another 52.
-        exponent -= 1075;
-        realMant = mantissa;
-
-        // normalize
-        while (realMant >= 1.0) {
-            mantissa >>= 1;
-            realMant /= 2.;
-            exponent++;
-        }
-
-        // if (neg) {
-        //     realMant = realMant * -1;
-        // }
-
-        fmt::print("{}, {}\n", exponent, realMant);
-    }
-    {
-        int e;
-        double t_m = frexp(d, &e);
-        uint64_t m = static_cast<uint64_t>(t_m * two53);
-
-        fmt::print("{}, {}\n", e, t_m);
+        auto v1 = powc(x, a);
+        auto v2 = pow(x, a);
+        fmt::print("{:.52f}\n{:.52f}\n", v1, v2);
     }
 }
 
@@ -923,16 +705,22 @@ int
 main()
 {
 
-    for (int i : itertools::range(45)) {
-        // double d = 26 * i + i / 10.0f + i / 7.f + 999.0f / i;
-        // frexp_tests(d);
-        // std::cout << std::endl;
-        fmt::print("{}\n", i);
-        fmt::print("{:.52f}\n", myexp(-i));
-        fmt::print("{:.52f}\n", exp(-i));
-    }
+    // exp_tests();
+    // frexp_tests();
 
-    // print_pow_2_tables(64);
+    // double t = 2.0;
+
+    // double v = cldexp(t, 10);
+
+    // log2c(5.12652145);
+
+    pow_tests();
+
+    // auto tup2 = cfrexp(10.0);
+    // std::cout << itertools::to_string(tup2) << std::endl;
+    // auto [s, e, m] = tup2;
+    // std::cout << static_cast<double>(m) / two53 << std::endl;
+
     // zip_tests();
     // any_tests();
     // enumerate_tests();

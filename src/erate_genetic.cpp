@@ -4,6 +4,7 @@
 #include "../external/cxxopts.hpp"
 #include "../external/fmt/format.h"
 #include "../external/itertools/src/itertools.hpp"
+#include "../external/itertools/src/math.hpp"
 #include "../external/random_v/src/random_v.hpp"
 #include "utils.cpp"
 
@@ -150,7 +151,7 @@ calc_pool_fitness(std::vector<erate_t>& erate_data,
                     bucket["average_discount"] =
                       double_round(bucket["total_discount"] /
                                      (bucket["count"] * 100),
-                                   2); // maybe change this.
+                                   1); // maybe change this.
                     bucket["discount_cost"] =
                       bucket["average_discount"] * bucket["total_cost"];
 
@@ -164,7 +165,9 @@ calc_pool_fitness(std::vector<erate_t>& erate_data,
           critter.fitness() > max_critter->fitness() ? &critter : max_critter;
 
         for (auto& [_, bucket] : buckets) {
-            for (auto& [key, value] : bucket) { value = 0; }
+            for (auto& [key, value] : bucket) {
+                value = 0;
+            }
         }
     }
     *randomize = false;
@@ -366,7 +369,9 @@ optimize_buckets(std::vector<erate_t>& erate_data,
         randomize = false;
         auto t_erate_data = process_erate_data(load_file);
         auto genes = make_genes(t_erate_data, bucket_count, rng);
-        for (auto& critter : critters) { critter.genes(genes); }
+        for (auto& critter : critters) {
+            critter.genes(genes);
+        }
     }
 
     auto mutation_count =
@@ -391,7 +396,9 @@ optimize_buckets(std::vector<erate_t>& erate_data,
     auto max_critter = &critters[0];
 
     std::vector<size_t> parent_ixs(parent_count, 0);
-    for (auto i : itertools::range(parent_count)) { parent_ixs[i] = i; }
+    for (auto i : itertools::range(parent_count)) {
+        parent_ixs[i] = i;
+    }
     std::vector<size_t> crossover_distb(crossover_count, 0);
 
     int max_gap = 0;

@@ -40,6 +40,10 @@ class Random
     Random(StateType* state, DriverType& rng)
       : Random(*state, rng){};
 
+    Random(StateType state, DriverType& rng, OutputType out_state)
+      : _state(state)
+      , _rng(rng){};
+
     StateType state() { return _state; };
     StateType state() const { return _state; };
     void state(StateType state) { _state = state; };
@@ -62,7 +66,8 @@ class Random
         OutputType t = (-range) % range;
         while (true) {
             OutputType r = this->generate();
-            if (r >= t) return r % range;
+            if (r >= t)
+                return r % range;
         }
     };
 
