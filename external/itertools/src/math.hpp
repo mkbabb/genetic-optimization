@@ -19,6 +19,8 @@
 constexpr uint64_t two53 = 9007199254740992;
 constexpr uint64_t two52 = 4503599627370496;
 
+constexpr uint32_t two23 = 8388608;
+
 constexpr double log2_e = 1.442695040888963407359924681001892137426645954152;
 constexpr double pi = 3.141592653589793238462643383279502884197169399375;
 constexpr double e = 2.718281828459045235360287471352662497757247093699;
@@ -291,20 +293,11 @@ constexpr double POW_2_IM2[64] =
    0.9999999999999999998496976641969410179606967843253346,
    0.9999999999999999999248488320984705089775245431441854};
 
-union double_bits
+union double_bits_parts
 {
-    double dvalue;
-    uint64_t ivalue;
-
-    constexpr double_bits(double d)
-      : dvalue(d){};
-};
-
-union double_bits_struct
-{
-    double dvalue;
-    constexpr double_bits_struct(double d)
-      : dvalue(d){};
+    double value;
+    constexpr double_bits_parts(double d)
+      : value(d){};
 
     struct
     {
@@ -315,121 +308,69 @@ union double_bits_struct
     } parts;
 };
 
-std::tuple<uint, int, uint64_t>
-frexp0(double d)
+union float_bits_parts
 {
-    uint sign = 0;
-    int exponent;
+    float value;
+    constexpr float_bits_parts(float f)
+      : value(f){};
 
-    double dmantissa = frexp(d, &exponent);
+    struct
+    {
+        uint32_t mantissa : 23;
+        uint exponent : 8;
+        uint sign : 1;
 
-    if (dmantissa < 0) {
-        dmantissa *= -1;
-        sign = 1;
-    }
+    } parts;
+};
 
-    uint64_t mantissa = dmantissa * two53;
-
-    return {sign, exponent, mantissa};
-}
-
-constexpr std::tuple<uint, int, uint64_t>
-frexp1(double d)
-{
-    uint64_t ivalue = 0;
-
-    double_bits db(d);
-
-    uint sign = db.ivalue >> 63;
-    int exponent = (db.ivalue << 1) >> 53;
-    uint64_t mantissa = (db.ivalue << 12) >> 12;
-
-    if (exponent == 0) {
-        exponent++;
-    } else {
-        mantissa |= (1L << 52);
-    }
-    exponent -= 1022;
-
-    return {sign, exponent, mantissa};
-}
-
-/**
- * @brief 
- * 
- * @param d 
- * @return constexpr std::tuple<uint, int, uint64_t> 
- */
 constexpr std::tuple<uint, int, uint64_t>
 cfrexp(double d)
 {
-    double_bits_struct db(d);
+    double_bits_parts db(d);
 
-    uint sign = db.parts.sign;
+    auto sign = db.parts.sign;
 
     // Remove bias of 2^(sizeof(exponent) - 1) - 2 = 2^10 - 2;
-    int exponent = db.parts.exponent - 1022;
-    uint64_t mantissa =
+    auto exponent =
+      db.parts.exponent - std::numeric_limits<double>::min_exponent - 1;
+    auto mantissa =
       db.parts.mantissa + two52; // Normalize; equivalent to adding 0.5 to the
                                  // double variant thereof.
 
     return {sign, exponent, mantissa};
 }
 
-/**
- * @brief 
- * 
- * @param d 
- * @param p 
- * @return constexpr double 
- */
+constexpr std::tuple<uint, int, uint32_t>
+cfrexp(float f)
+{
+    float_bits_parts fb(f);
+
+    auto sign = fb.parts.sign;
+
+    auto exponent = fb.parts.exponent - 126;
+    auto mantissa = fb.parts.mantissa + two23;
+
+    return {sign, exponent, mantissa};
+}
+
 constexpr double
 cldexp(double d, int p)
 {
-    double_bits_struct db(d);
+    double_bits_parts db(d);
     db.parts.exponent += p;
-    return db.dvalue;
+    return db.value;
 }
 
-std::tuple<uint, int, uint64_t>
-frexp3(double d)
+constexpr double
+cldexp(float f, int p)
 {
-    uint64_t ivalue = *((uint64_t*) (&d));
-
-    double mantissa = 1.0;
-
-    uint sign = ivalue >> 63;
-    int exponent = (int) ((ivalue >> 52) & 0x7ffL);
-    uint64_t imantissa = ivalue & 0xfffffffffffffL;
-
-    if (exponent == 0) {
-        exponent++;
-    } else {
-        imantissa |= (1L << 52);
-    }
-
-    // bias the exponent - actually biased by 1023.
-    // we are treating the mantissa as m.0 instead of 0.m
-    //  so subtract another 52.
-    exponent -= 1075;
-    mantissa = imantissa;
-    uint64_t mant = imantissa;
-
-    // normalize
-    while (mantissa >= 1.0) {
-        imantissa >>= 1;
-        mantissa /= 2.;
-        exponent++;
-    }
-
-    if (sign) {
-        mantissa *= -1;
-    }
-
-    return {sign, exponent, mant};
+    float_bits_parts fb(f);
+    fb.parts.exponent += p;
+    return fb.value;
 }
 
-double constexpr exp2c(double x)
+constexpr double
+exp2c(double x)
 {
     bool inverse = false;
     if (x < 0) {
@@ -441,95 +382,181 @@ double constexpr exp2c(double x)
     uint64_t n = z;
     double m = z - n;
 
-    double q =
-      1.0; // This should be changed to utilize a modified variant of cldexp.
+    double q = 1.0;
 
     if (n < 64) {
         q *= POW_2[64 - (n + 1)];
-    } else if (n > 1023) {
+    } else if (n > 1024 - 1) {
         return std::numeric_limits<double>::infinity();
     } else {
-        q *= POW_2[0];
-        for (auto i : itertools::range(n - 63)) {
-            q *= 2.0;
+        double_bits_parts qb(POW_2[0]);
+
+        for (auto i : itertools::range(n - 64 - 1)) {
+            if (qb.parts.exponent > 2046) {
+                return -1;
+            } else {
+                qb.parts.exponent++;
+            }
         }
+        q = qb.value;
     }
 
     auto [sign, exponent, mantissa] = cfrexp(m);
 
-    size_t i = 0;
     size_t high_bit = 0;
 
-    while (i < 64) {
+    for (auto i : itertools::range(64)) {
         if (mantissa & POW_2[i]) {
             if (!high_bit) {
                 high_bit = i - 1 + exponent;
             }
             q *= POW_2_M2[i - high_bit];
         }
-        i++;
     }
     return inverse ? 1 / q : q;
 }
 
-double constexpr expc(double x) { return exp2c(x * log2_e); }
-
-constexpr uint DBL_EXP_MAX = 2046;
-constexpr uint DBL_EXP_MIN = 0;
-
-double constexpr log2c(double x)
+/**
+ * @brief Constant evaluated log_2(x). As the standard C implementation of log2
+ * is non-constant-evaluated, one must forswear the usage of complie time
+ * constants in the form of log_2(x). The institution hereof allows for exactly
+ * that.
+ *
+ * First, we convert a double, x, into its IEEE floating point format of:
+ *
+ * sign, exponent, mantissa.
+ *
+ * Wherein any double, x, may be thereby represented as:
+ *
+ * 2^exponent*mantissa.
+ *
+ * To normalize x, we must remove the 2^exponent value; we'll either increment
+ * or decrement the exponent
+ *
+ * @param x
+ * @return constexpr double
+ */
+constexpr double
+log2c(double x)
 {
     if (x <= 0) {
         return -1;
     }
 
-    double_bits_struct db(x);
+    double_bits_parts db(x);
 
+    // int bias = db.value >= 2 ? -db.parts.exponent : db.parts.exponent;
     int bias = 0;
 
-    while (true) {
-        if (db.dvalue < 1) {
+    db.parts.exponent = 0;
+
+    do {
+        if (db.value < 1) {
             bias--;
-            if (db.parts.exponent > DBL_EXP_MAX) {
+            if (db.parts.exponent > 2045) {
                 return -1;
             } else {
                 db.parts.exponent++;
             }
         }
-        if (db.dvalue >= 2) {
+        if (db.value >= 2) {
             bias++;
-            if (db.parts.exponent < DBL_EXP_MIN) {
+            if (db.parts.exponent < 0) {
                 return -1;
             } else {
                 db.parts.exponent--;
             }
         }
-        if (db.dvalue >= 1 && db.dvalue < 2) {
-            break;
-        }
-    }
+    } while (!(db.value >= 1 && db.value < 2));
 
-    x = db.dvalue;
+    x = db.value;
 
-    size_t i = 1;
-    double q = 0;
+    double q = 0.0;
 
-    while (i < 64) {
+    for (auto i : itertools::range(64)) {
         if (x >= POW_2_M2[i]) {
             x *= POW_2_IM2[i];
             q += POW_I2[i];
         }
-        i++;
     }
 
     return q + bias;
 }
 
-double constexpr lnc(double x) { return log2c(x) / log2_e; }
+/**
+ * @brief Constant evaluated exponential of x.
+ *
+ * @param x exponent in e^x.
+ * @return constexpr double of e^x
+ */
+constexpr double
+expc(double x)
+{
+    return exp2c(x * log2_e);
+}
 
-double constexpr logac(double x, double a) { return log2c(x) / log2c(a); }
+/**
+ * @brief Constant evaluated natural log of x.
+ *
+ * @param x input number whereof the take the natural logarithm.
+ * @return constexpr double of log(x)
+ */
+constexpr double
+logc(double x)
+{
+    return log2c(x) / log2_e;
+}
 
-double constexpr powc(double x, double a) { return exp2c(log2c(x) * a); }
+/**
+ * @brief Performs the log_b(x). Done by way log rules, reducing the logarithm
+ * to quotient of two log_2.
+ *
+ * @param x input number whereof to take the logarithm base b.
+ * @param b base of the aforesaid logarithm.
+ * @return constexpr double of log_b(x)
+ */
+constexpr double
+logbc(double x, double b)
+{
+    return log2c(x) / log2c(b);
+}
+
+/**
+ * @brief Constant evaluated power function, converting an expression:
+ *
+ * x^b = 2^(log_2(x)*b).
+ *
+ * @param x exponent base.
+ * @param b exponent.
+ * @return constexpr double of x^b.
+ */
+constexpr double
+powc(double x, double b)
+{
+    return exp2c(log2c(x) * b);
+}
+
+/**
+ * @brief Integer exponent overload for powc. If b is an integer, perform a
+ * series of consecutive multiplications (much faster than the standard powc).
+ *
+ * @param x exponent base
+ * @param b exponent
+ * @return constexpr double of x^b.
+ */
+constexpr double
+powc(double x, int b)
+{
+    bool inverse = false;
+    if (b < 0) {
+        inverse = true;
+        b *= -1;
+    }
+    while (b-- > 0) {
+        x *= x;
+    }
+    return inverse ? 1 / x : x;
+}
 
 /**
  * Performs a linear mapping 'twixt two intervals, [x1, y1] and [x2, y2].
@@ -559,5 +586,7 @@ gaussian(double x,
         c = sigma;
     }
     double n = inverse ? 1 : -1;
-    return a * pow(e, n * pow((x - b) / (sqrt2 * c), 2));
+    auto exponent = n * powc((x - b) / (sqrt2 * c), 2);
+
+    return a * powc(e, exponent);
 }
