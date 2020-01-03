@@ -49,7 +49,7 @@
             "program": "${workspaceFolder}/build/${workspaceFolderBasename}",
             "args": [
                 "-i",
-                "./data/erate-2019-start.csv",
+                "data/discount_rates_invoices_10_2019.csv",
                 "-o",
                 "./data/out-0.csv",
                 "--load_file",

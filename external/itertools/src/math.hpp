@@ -308,21 +308,6 @@ union double_bits_parts
     } parts;
 };
 
-union float_bits_parts
-{
-    float value;
-    constexpr float_bits_parts(float f)
-      : value(f){};
-
-    struct
-    {
-        uint32_t mantissa : 23;
-        uint exponent : 8;
-        uint sign : 1;
-
-    } parts;
-};
-
 constexpr std::tuple<uint, int, uint64_t>
 cfrexp(double d)
 {
@@ -332,23 +317,10 @@ cfrexp(double d)
 
     // Remove bias of 2^(sizeof(exponent) - 1) - 2 = 2^10 - 2;
     auto exponent =
-      db.parts.exponent - std::numeric_limits<double>::min_exponent - 1;
+      db.parts.exponent + std::numeric_limits<double>::min_exponent - 1;
     auto mantissa =
       db.parts.mantissa + two52; // Normalize; equivalent to adding 0.5 to the
                                  // double variant thereof.
-
-    return {sign, exponent, mantissa};
-}
-
-constexpr std::tuple<uint, int, uint32_t>
-cfrexp(float f)
-{
-    float_bits_parts fb(f);
-
-    auto sign = fb.parts.sign;
-
-    auto exponent = fb.parts.exponent - 126;
-    auto mantissa = fb.parts.mantissa + two23;
 
     return {sign, exponent, mantissa};
 }
@@ -359,14 +331,6 @@ cldexp(double d, int p)
     double_bits_parts db(d);
     db.parts.exponent += p;
     return db.value;
-}
-
-constexpr double
-cldexp(float f, int p)
-{
-    float_bits_parts fb(f);
-    fb.parts.exponent += p;
-    return fb.value;
 }
 
 constexpr double
@@ -589,4 +553,39 @@ gaussian(double x,
     auto exponent = n * powc((x - b) / (sqrt2 * c), 2);
 
     return a * powc(e, exponent);
+}
+
+template<typename T>
+auto
+double_round(T x, int ndigits = 0) -> double
+{
+    double pow1, pow2, y, z;
+    if (ndigits >= 0) {
+        if (ndigits > 22) {
+            /* pow1 and pow2 are each safe from overflow, but
+               pow1*pow2 ~= pow(10.0, ndigits) might overflow */
+            pow1 = pow(10.0, (double) (ndigits - 22));
+            pow2 = 1e22;
+        } else {
+            pow1 = pow(10.0, (double) ndigits);
+            pow2 = 1.0;
+        }
+        y = (x * pow1) * pow2;
+        /* if y overflows, then rounded value is exactly x */
+    } else {
+        pow1 = pow(10.0, (double) -ndigits);
+        pow2 = 1.0; /* unused; silences a gcc compiler warning */
+        y = x / pow1;
+    }
+
+    z = round(y);
+    if (fabs(y - z) == 0.5)
+        /* halfway between two integers; use round-half-even */
+        z = 2.0 * round(y / 2.0);
+
+    if (ndigits >= 0)
+        z = (z / pow2) / pow1;
+    else
+        z *= pow1;
+    return z;
 }

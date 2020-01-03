@@ -24,8 +24,8 @@
 
 constexpr int MAX_2015 = 11'810'384;
 constexpr int MAX_2019 = 15'034'520;
-// constexpr double GAUSSIAN_SQRT2_INV =a
-//   itertools::gaussian(1, itertools::sqrt2, 1, 0, itertools::sqrt2_2, true);
+
+auto GAUSSIAN_SQRT2_INV = gaussian(1, sqrt2, 1, 0, sqrt2_2, true);
 
 using namespace std::literals;
 
@@ -50,23 +50,21 @@ class Critter
         std::fill(begin(_genes), end(_genes), 0);
     }
 
-    Critter(size_t N, std::vector<int>&& g)
+    Critter(size_t N, std::vector<int>&& genes)
       : _fitness(0)
       , _skip(false)
     {
         _genes.resize(N);
-        this->genes(g);
+        this->genes(genes);
     }
 
     auto genes() -> std::vector<int>& { return _genes; }
-    auto genes() const -> const std::vector<int> { return _genes; }
     void genes(const std::vector<int>& g)
     {
         std::copy(begin(g), end(g), begin(_genes));
     }
 
     double fitness() { return _fitness; }
-    double fitness() const { return _fitness; }
     void fitness(double f) { _fitness = f; }
 
     bool skip() { return _skip; }
@@ -114,6 +112,62 @@ process_erate_data(std::string in_file, int count = -1) -> std::vector<erate_t>
 
 template<typename T>
 auto
+calc_critter_fitness((std::vector<erate_t>& erate_data,
+                    Critter& critter,
+                     std::map<size_t, std::map<std::string, double>>& buckets,
+                     size_t max_bucket,
+                     bool* randomize,
+                     T& rng) -> void
+{
+    auto fitness = 0.0;
+
+    if (critter.skip() && !(*(randomize))) {
+        fitness = critter.fitness();
+    } else {
+        for (auto& [n, school] : itertools::enumerate(erate_data)) {
+            auto r = !(*(randomize)) ? critter.genes()[i]
+                                     : rng.randrange(0, buckets.size());
+
+            while (buckets[r]["count"] >= max_bucket) {
+                r = rng.randrange(0, buckets.size());
+            }
+
+            auto& bucket = buckets[r];
+
+            bucket["total_cost"] += school.cost;
+            bucket["total_discount"] += school.discount;
+            bucket["count"]++;
+
+            critter.genes()[i] = r;
+        }
+
+        for (auto& [_, bucket] : buckets) {
+            if (bucket["count"] > 0) {
+                bucket["average_discount"] =
+                  bucket["total_discount"] / (bucket["count"] * 100);
+
+                bucket["average_discount"] =
+                  double_round(bucket["average_discount"], 2);
+
+                bucket["discount_cost"] =
+                  bucket["average_discount"] * bucket["total_cost"];
+
+                fitness += bucket["discount_cost"];
+            }
+        }
+        critter.fitness(fitness);
+    }
+    critter.skip(false);
+
+    for (auto& [_, bucket] : buckets) {
+        for (auto& [key, value] : bucket) {
+            value = 0;
+        }
+    }
+}
+
+template<typename T>
+auto
 calc_pool_fitness(std::vector<erate_t>& erate_data,
                   std::map<size_t, std::map<std::string, double>>& buckets,
                   std::vector<Critter>& critters,
@@ -124,51 +178,10 @@ calc_pool_fitness(std::vector<erate_t>& erate_data,
 
 {
     for (auto& critter : critters) {
-        auto fitness = 0.0;
+        calc_critter_fitness(critter, buckets, max_bucket, randomize, rng);
 
-        if (critter.skip() && !(*(randomize))) {
-            fitness = critter.fitness();
-        } else {
-            for (auto i : itertools::range(erate_data.size())) {
-                auto j = !(*(randomize)) ? critter.genes()[i]
-                                         : rng.randrange(0, buckets.size());
-
-                while (buckets[j]["count"] >= max_bucket) {
-                    j = rng.randrange(0, buckets.size());
-                }
-
-                auto& bucket = buckets[j];
-
-                bucket["total_cost"] += erate_data[i].cost;
-                bucket["total_discount"] += erate_data[i].discount;
-                bucket["count"]++;
-
-                critter.genes()[i] = j;
-            }
-
-            for (auto& [_, bucket] : buckets) {
-                if (bucket["count"] > 0) {
-                    bucket["average_discount"] =
-                      double_round(bucket["total_discount"] /
-                                     (bucket["count"] * 100),
-                                   1); // maybe change this.
-                    bucket["discount_cost"] =
-                      bucket["average_discount"] * bucket["total_cost"];
-
-                    fitness += bucket["discount_cost"];
-                }
-            }
-            critter.fitness(fitness);
-        }
-        critter.skip(false);
         max_critter =
           critter.fitness() > max_critter->fitness() ? &critter : max_critter;
-
-        for (auto& [_, bucket] : buckets) {
-            for (auto& [key, value] : bucket) {
-                value = 0;
-            }
-        }
     }
     *randomize = false;
     return max_critter;
@@ -184,7 +197,10 @@ proportionate_selection(std::vector<Critter>& critters,
 
     auto total_fitness = 0.0;
     for (auto& critter : critters) {
-        critter.fitness(pow((critter.fitness() / max_fitness), 100));
+        auto g_fitness =
+          powc(GAUSSIAN_SQRT2_INV, (critter.fitness() / max_fitness));
+
+        critter.fitness(g_fitness);
         total_fitness += critter.fitness();
     }
 
@@ -264,7 +280,6 @@ mutate_critters(std::vector<Critter*>& critters,
 void
 cull_mating_pool(std::vector<Critter>& critters, std::vector<Critter>& children)
 {
-
     for (auto [n, critter] : itertools::enumerate(critters)) {
         critters[n] = children[n];
         critters[n].skip(true);

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <functional>
 #include <iostream>
 #include <iterator>
 #include <map>
@@ -142,8 +143,7 @@ constexpr auto
 deref_fwd_volatile(Tup&& tup)
 {
     return index_apply<N>([&tup](auto... Ixs) {
-        return std::forward_as_tuple(
-          const_cast<decltype(*std::get<Ixs>(tup))>(*std::get<Ixs>(tup))...);
+        return std::make_tuple(std::ref(*std::get<Ixs>(tup))...);
     });
 }
 
@@ -151,8 +151,9 @@ template<class Tup, const size_t N = tuple_size<Tup>::value>
 constexpr auto
 deref_copy(Tup&& tup)
 {
-    return index_apply<N>(
-      [&tup](auto... Ixs) { return std::make_tuple(*std::get<Ixs>(tup)...); });
+    return index_apply<N>([&tup](auto... Ixs) {
+        return std::make_tuple(*(std::get<Ixs>(tup))...);
+    });
 }
 
 template<class Tup>
@@ -437,7 +438,10 @@ class zip_iterator
         return !(*this == rhs);
     }
 
-    constexpr auto operator*() noexcept { return deref_fwd_volatile(_args); }
+    constexpr auto operator*() noexcept
+    {
+        return deref_copy(std::forward<pointer_type>(_args));
+    }
     constexpr auto operator-> () noexcept { return _args; }
 
     std::tuple<Args...> _args;
@@ -670,8 +674,6 @@ mul(Iterable&& iter)
                                                  return i * v;
                                              });
 }
-
-
 
 template<class Iterable>
 constexpr Iterable

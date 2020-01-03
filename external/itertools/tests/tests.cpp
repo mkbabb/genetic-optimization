@@ -479,10 +479,7 @@
 //     {
 //         auto iter = std::make_tuple(1, 2, 3, 4, 5, 6);
 //         auto ndim = itertools::get_ndim(iter);
-//         std::string s = itertools::to_string(iter, [](auto&& v) ->
-//         std::string {
-//             return std::to_string(v);
-//         });
+//         std::string s = itertools::to_string(iter);
 //         if (print) {
 //             std::cout << s << std::endl;
 //         }
@@ -492,10 +489,10 @@
 //                                     std::make_tuple(1, 2, 3, 4, 5, 6),
 //                                     std::make_tuple(1, 2, 3, 4, 5, 6));
 //         auto ndim = itertools::get_ndim(iter);
-//         std::string s = itertools::to_string(iter, [](auto&& v) ->
-//         std::string {
-//             return " " + std::to_string(v) + " ";
-//         });
+//         std::string s =
+//           itertools::to_string_f(iter, [](auto&& v) -> std::string {
+//               return " " + std::to_string(v) + " ";
+//           });
 //         if (print) {
 //             std::cout << s << std::endl;
 //         }
@@ -504,10 +501,7 @@
 //         std::vector<std::map<int, int>> iter = {{{1, 2}, {3, 4}},
 //                                                 {{5, 6}, {7, 8}}};
 //         auto ndim = itertools::get_ndim(iter);
-//         std::string s = itertools::to_string(iter, [](auto&& v) ->
-//         std::string {
-//             return std::to_string(v);
-//         });
+//         std::string s = itertools::to_string(iter);
 //         if (print) {
 //             std::cout << s << std::endl;
 //         }
@@ -517,10 +511,7 @@
 //         int>>
 //           iter = {{{{{1, 2}}, {{3, 4}}}, 1}, {{{{5, 6}}, {{7, 8}}}, 4}};
 //         auto ndim = itertools::get_ndim(iter);
-//         std::string s = itertools::to_string(iter, [](auto&& v) ->
-//         std::string {
-//             return std::to_string(v);
-//         });
+//         std::string s = itertools::to_string(iter);
 //         if (print) {
 //             std::cout << s << std::endl;
 //         }
@@ -560,10 +551,7 @@
 
 //                      {{60, 61}, {62, 63}}}}}};
 //         auto ndim = itertools::get_ndim(iter);
-//         std::string s = itertools::to_string(iter, [](auto&& v) ->
-//         std::string {
-//             return std::to_string(v);
-//         });
+//         std::string s = itertools::to_string(iter);
 //         if (print) {
 //             std::cout << s << std::endl;
 //         }
@@ -584,10 +572,7 @@
 //                {3, {2, 3, 4}},
 //                {4, {3, 4, 5}}}}};
 //         auto ndim = itertools::get_ndim(iter);
-//         std::string s = itertools::to_string(iter, [](auto&& v) ->
-//         std::string {
-//             return std::to_string(v);
-//         });
+//         std::string s = itertools::to_string(iter);
 //         if (print) {
 //             std::cout << s << std::endl;
 //         }
@@ -611,10 +596,7 @@
 //             81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96,
 //             97, 98, 99}};
 //         auto ndim = itertools::get_ndim(iter);
-//         std::string s = itertools::to_string(iter, [](auto&& v) ->
-//         std::string {
-//             return std::to_string(v);
-//         });
+//         std::string s = itertools::to_string(iter);
 //         if (print) {
 //             std::cout << s << std::endl;
 //         }
@@ -776,25 +758,24 @@ frexp_tests()
     for (double i : itertools::range(100'000)) {
         double d = static_cast<double>(rng.randrange(a, b)) / 10000.0;
 
-        auto tup0 = frexp0(d);
-        auto tup1 = frexp1(d);
-        auto tup2 = cfrexp(d);
+        auto tup0 = cfrexp(d);
+        auto tup1 = frexp0(d);
+        auto tup2 = frexp1(d);
         auto tup3 = frexp3(d);
 
-        // assert(tup0 == tup1);
-        // assert(tup0 == tup2);
-        // assert(tup0 == tup3);
+        assert(tup0 == tup1);
+        assert(tup0 == tup2);
+        assert(tup0 == tup3);
 
-        std::cout << itertools::to_string(tup0) << std::endl;
-        std::cout << itertools::to_string(tup1) << std::endl;
-        std::cout << itertools::to_string(tup2) << std::endl;
-        std::cout << itertools::to_string(tup3) << std::endl;
+        // std::cout << itertools::to_string(tup0) << std::endl;
+        // std::cout << itertools::to_string(tup1) << std::endl;
+        // std::cout << itertools::to_string(tup2) << std::endl;
+        // std::cout << itertools::to_string(tup3) << std::endl;
+        // std::cout << std::endl;
     }
 }
 
 // auto GAUSSIAN_SQRT2_INV = gaussian(1, sqrt2, 1, 0, sqrt2_2, true);
-
-// constexpr auto v = powc(10, 10);
 
 int
 main()
@@ -813,7 +794,23 @@ main()
 
     frexp_tests();
 
+    std::vector<int> me1 = {1, 2, 3, 4, 5, 6};
+    std::vector<int> me2 = {10, 9, 8, 7, 6, 5};
+    std::vector<int> me3 = {10, 9, 8, 7, 6, 5};
+
+    auto tmp = itertools::enumerate(me1);
+
+    for (auto v : itertools::zip(itertools::zip(me1, me2), me3)) {
+        std::cout << "hi" << std::endl;
+        auto [n, i, j] = tupletools::flatten(v);
+        // std::cout << fmt::format("{}, {}", n, i) << std::endl;
+    }
+
     // pow_tests();
+
+    // for (auto i = 0.0; i < 1.0; i += 0.001) {
+    //     fmt::print("{}, {}\n", i, double_round(i, 2));
+    // };
 
     // auto tup2 = cfrexp(10.0);
     // std::cout << itertools::to_string(tup2) << std::endl;

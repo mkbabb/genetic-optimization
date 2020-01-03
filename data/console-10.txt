@@ -1,1 +1,0 @@
-./build/erate -i erate-data/erate-2019-start.csv -o ./erate-data/out-10.csv --bucket_count 4 --population_count 200 --max_bucket 200 --parent_count 10 --mating_pool_count 20 --mutation_rate 1 --mutation_threshold_low 100000 --mutation_threshold_high 500000 --iterations 100000000
