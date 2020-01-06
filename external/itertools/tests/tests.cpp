@@ -800,11 +800,17 @@ main()
 
     auto tmp = itertools::enumerate(me1);
 
-    for (auto v : itertools::zip(itertools::zip(me1, me2), me3)) {
+    auto ko = itertools::zip(me1) | [](auto tup) { return tup; };
+
+    for (auto v : ko) {
         std::cout << "hi" << std::endl;
-        auto [n, i, j] = tupletools::flatten(v);
-        // std::cout << fmt::format("{}, {}", n, i) << std::endl;
     }
+
+    // for (auto v : itertools::zip(itertools::zip(me1, me2), me3)) {
+    //     std::cout << "hi" << std::endl;
+    //     auto [n, i, j] = tupletools::flatten(v);
+    //     // std::cout << fmt::format("{}, {}", n, i) << std::endl;
+    // }
 
     // pow_tests();
 

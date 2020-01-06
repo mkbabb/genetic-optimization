@@ -405,18 +405,19 @@ Notice the hereinbefore shown containers were of unequal length:
 the zip iterator automatically scales downward to the smallest of the given
 container sizes.
  */
-template<class... Args>
+template<class T, class... Args>
 class zip_impl;
 
-template<class... Args>
+template<class S, class... Args>
 class zip_iterator
 {
   public:
     using iterator_category = std::forward_iterator_tag;
     using pointer_type = std::tuple<Args...>;
 
-    explicit constexpr zip_iterator(Args&&... args) noexcept
-      : _args(args...)
+    explicit constexpr zip_iterator(S func, Args&&... args) noexcept
+      : _func(func)
+      , _args(args...)
     {}
 
     constexpr auto operator++()
@@ -440,28 +441,43 @@ class zip_iterator
 
     constexpr auto operator*() noexcept
     {
-        return deref_copy(std::forward<pointer_type>(_args));
+        return _func(deref_copy(std::forward<pointer_type>(_args)));
     }
     constexpr auto operator-> () noexcept { return _args; }
 
     std::tuple<Args...> _args;
+    S _func;
 };
 
-template<class... Args>
+template<class T, class... Args>
 class [[nodiscard]] zip_impl
 {
     static constexpr size_t N = sizeof...(Args);
     static_assert(N > 0, "!");
 
   public:
-    using it_begin = zip_iterator<decltype(std::declval<Args>().begin())...>;
-    using it_end = zip_iterator<decltype(std::declval<Args>().end())...>;
+    using it_begin = zip_iterator<T, decltype(std::declval<Args>().begin())...>;
+    using it_end = zip_iterator<T, decltype(std::declval<Args>().end())...>;
 
-    explicit constexpr zip_impl(Args && ... args)
-      : _begin(args.begin()...)
-      , _end(args.end()...){};
+    // explicit constexpr zip_impl(Args && ... args)
+    //   : _begin([](auto tup) { return tup; }, args.begin()...)
+    //   , _end([](auto tup) { return tup; }, args.end()...){};
+
+    constexpr zip_impl(T func, Args && ... args)
+      : _begin(func, args.begin()...)
+      , _end(func, args.end()...)
+      , _args{args...}
+      , _func{func} {};
 
     zip_impl& operator=(const zip_impl& rhs) = default;
+
+    template<class S>
+    zip_impl<S, Args...> operator|(S funk)
+    {
+        return index_apply<N>([&](auto... Ixs) {
+            return zip_impl<S, Args...>{funk, std::get<Ixs>(_args)...};
+        });
+    };
 
     ~zip_impl() = default;
 
@@ -469,6 +485,8 @@ class [[nodiscard]] zip_impl
     it_end end() { return _end; }
 
   private:
+    T _func;
+    std::tuple<Args...> _args;
     it_begin _begin;
     it_end _end;
 };
@@ -484,19 +502,33 @@ template<class... Args,
 constexpr auto
 zip(Args&&... args)
 {
-    return detail::zip_impl<Args...>(std::forward<Args>(args)...);
+    auto func = [](auto tup) { return tup; };
+    return detail::zip_impl<decltype(func),
+                            Args...>(std::forward<decltype(func)>(func),
+                                     std::forward<Args>(args)...);
 }
 
-template<class Args, std::enable_if_t<tupletools::is_tupleoid_v<Args>, int> = 0>
+// template<class Args, std::enable_if_t<tupletools::is_tupleoid_v<Args>, int> =
+// 0> constexpr auto zip(Args&& args)
+// {
+//     auto func = [&](auto&&... _args) {
+//         return detail::zip_impl<decltype(_args)...>(
+//           std::forward<decltype(_args)>(_args)...);
+//     };
+//     return tupletools::apply(std::forward<decltype(args)>(args),
+//                              std::forward<decltype(func)>(func));
+// }
+
+template<class T,
+         class... Args,
+         size_t N = sizeof...(Args),
+         std::enable_if_t<!(tupletools::is_tupleoid_v<Args> || ...) && N != 0,
+                          int> = 0>
 constexpr auto
-zip(Args&& args)
+zip(T func, Args&&... args)
 {
-    auto func = [&](auto&&... _args) {
-        return detail::zip_impl<decltype(_args)...>(
-          std::forward<decltype(_args)>(_args)...);
-    };
-    return tupletools::apply(std::forward<decltype(args)>(args),
-                             std::forward<decltype(func)>(func));
+    return detail::zip_impl<T, Args...>(std::forward<T>(func),
+                                        std::forward<Args>(args)...);
 }
 
 /*
