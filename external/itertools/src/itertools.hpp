@@ -439,10 +439,7 @@ class zip_iterator
         return !(*this == rhs);
     }
 
-    constexpr auto operator*() noexcept
-    {
-        return _func(deref_copy(std::forward<pointer_type>(_args)));
-    }
+    constexpr auto operator*() noexcept { return _func(deref_copy(_args)); }
     constexpr auto operator-> () noexcept { return _args; }
 
     std::tuple<Args...> _args;
@@ -472,11 +469,10 @@ class [[nodiscard]] zip_impl
     zip_impl& operator=(const zip_impl& rhs) = default;
 
     template<class S>
-    zip_impl<S, Args...> operator|(S funk)
+    auto operator|(S funk)
     {
-        return index_apply<N>([&](auto... Ixs) {
-            return zip_impl<S, Args...>{funk, std::get<Ixs>(_args)...};
-        });
+        return index_apply<N>(
+          [&](auto... Ixs) { return zip_f(funk, std::get<Ixs>(_args)...); });
     };
 
     ~zip_impl() = default;
@@ -508,6 +504,17 @@ zip(Args&&... args)
                                      std::forward<Args>(args)...);
 }
 
+template<class T,
+         class... Args,
+         std::enable_if_t<!(tupletools::is_tupleoid_v<Args> || ...), int> = 0>
+constexpr auto
+zip_f(T func, Args&&... args)
+{
+
+    return detail::zip_impl<T, Args...>(std::forward<T>(func),
+                                        std::forward<Args>(args)...);
+}
+
 // template<class Args, std::enable_if_t<tupletools::is_tupleoid_v<Args>, int> =
 // 0> constexpr auto zip(Args&& args)
 // {
@@ -518,18 +525,6 @@ zip(Args&&... args)
 //     return tupletools::apply(std::forward<decltype(args)>(args),
 //                              std::forward<decltype(func)>(func));
 // }
-
-template<class T,
-         class... Args,
-         size_t N = sizeof...(Args),
-         std::enable_if_t<!(tupletools::is_tupleoid_v<Args> || ...) && N != 0,
-                          int> = 0>
-constexpr auto
-zip(T func, Args&&... args)
-{
-    return detail::zip_impl<T, Args...>(std::forward<T>(func),
-                                        std::forward<Args>(args)...);
-}
 
 /*
 

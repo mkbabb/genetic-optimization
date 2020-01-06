@@ -800,7 +800,10 @@ main()
 
     auto tmp = itertools::enumerate(me1);
 
-    auto ko = itertools::zip(me1) | [](auto tup) { return tup; };
+    auto ko = itertools::zip(me1, itertools::zip(me2)) | [](auto tup) {
+        std::get<0>(tup) *= 100;
+        return tup;
+    };
 
     for (auto v : ko) {
         std::cout << "hi" << std::endl;
