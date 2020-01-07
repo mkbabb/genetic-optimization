@@ -52,7 +52,7 @@ folding.
  */
 template<class Tup, class Func, const size_t N = tuple_size<Tup>::value>
 constexpr auto
-apply(Tup&& tup, Func&& func)
+apply(Func&& func, Tup&& tup)
 {
     return index_apply<N>([&](auto... Ixs) {
         return std::invoke(std::forward<Func>(func),
@@ -115,6 +115,33 @@ reverse(Tup&& tup)
     return index_apply<N>([&tup](auto... Ixs) {
         return std::make_tuple(std::get<N - (Ixs + 1)>(tup)...);
     });
+}
+
+template<int Ix1, int Ix2, class Tup, const size_t N = tuple_size<Tup>::value>
+constexpr auto
+swap(Tup&& tup)
+{
+    auto tmp = std::get<Ix1>(tup);
+    std::get<Ix1>(tup) = std::get<Ix2>(tup);
+    std::get<Ix2>(tup) = tmp;
+    return tup;
+}
+
+template<class Tup, const size_t N = tuple_size<Tup>::value>
+constexpr auto
+roll(Tup&& tup, bool reverse = false)
+{
+    if (reverse) {
+        tupletools::for_each(tup, [&](const auto n, auto v) {
+            swap<0, N - (n + 1)>(tup);
+        });
+    } else {
+
+        tupletools::for_each(tup, [&](const auto n, auto v) {
+            swap<n, N - 1>(tup);
+        });
+    }
+    return tup;
 }
 
 template<class... Tuples,
@@ -370,14 +397,8 @@ using namespace tupletools;
 /*
 The zip and zip-iterator classes, respectively.
 
-Allows one to "zip" determinately any iterable type together, yielding thereupon
+Allows one to "zip" nearly any iterable type together, yielding thereupon
 subsequent iterations an n-tuple of respective iterable values.
-
-Each value yielded by aforesaid zip is declared as "const & T", so no copies are
-every made or attempted withal. The obstinancy of the yielded type is due to the
-rvalue acceptance provided herein. If a volatile reference is sought, one may
-circumvent the type by using the aforeprovided "const_downcast" methoed
-wherewith one may trivially assign or manipulate a now volatile reference.
 
 An example usage of zip:
 
@@ -388,9 +409,6 @@ An example usage of zip:
         ...
     }
 
-And to modify the const & of i or j:
-
-    tupletools::const_downcast(i) = "your value";
 
 An example of zip's r-value acquiescence:
 
@@ -405,75 +423,79 @@ Notice the hereinbefore shown containers were of unequal length:
 the zip iterator automatically scales downward to the smallest of the given
 container sizes.
  */
-template<class T, class... Args>
+template<class Func, class... Args>
 class zip_impl;
 
-template<class S, class... Args>
+template<class Func, class Tup>
 class zip_iterator
 {
   public:
     using iterator_category = std::forward_iterator_tag;
-    using pointer_type = std::tuple<Args...>;
 
-    explicit constexpr zip_iterator(S func, Args&&... args) noexcept
-      : _func(func)
-      , _args(args...)
+    explicit constexpr zip_iterator(Func func, Tup tup_args) noexcept
+      : func{func}
+      , tup_args{tup_args}
     {}
 
     constexpr auto operator++()
     {
-        increment_ref(_args);
+        increment_ref(this->tup_args);
         return *this;
     }
 
-    template<typename T>
-    constexpr bool operator==(T& rhs)
+    template<class Funk, class Tupe>
+    constexpr bool operator==(zip_iterator<Funk, Tupe>& rhs)
     {
         return any_where([](auto& x, auto& y) { return x == y; },
-                         _args,
-                         rhs._args);
+                         this->tup_args,
+                         rhs.tup_args);
     }
-    template<typename T>
-    constexpr bool operator!=(T& rhs)
+
+    template<class Funk, class Tupe>
+    constexpr bool operator!=(zip_iterator<Funk, Tupe>& rhs)
     {
         return !(*this == rhs);
     }
 
-    constexpr auto operator*() noexcept { return _func(deref_copy(_args)); }
-    constexpr auto operator-> () noexcept { return _args; }
+    constexpr auto operator*() noexcept { return deref_copy(this->tup_args); }
+    constexpr auto operator-> () noexcept { return this->tup_args; }
 
-    std::tuple<Args...> _args;
-    S _func;
+    Tup tup_args;
+    Func func;
 };
 
-template<class T, class... Args>
+template<class Func, class... Args>
 class [[nodiscard]] zip_impl
 {
     static constexpr size_t N = sizeof...(Args);
     static_assert(N > 0, "!");
 
   public:
-    using it_begin = zip_iterator<T, decltype(std::declval<Args>().begin())...>;
-    using it_end = zip_iterator<T, decltype(std::declval<Args>().end())...>;
+    using tup_it_begin = std::tuple<decltype(std::declval<Args>().begin())...>;
+    using tup_it_end = std::tuple<decltype(std::declval<Args>().end())...>;
 
-    // explicit constexpr zip_impl(Args && ... args)
-    //   : _begin([](auto tup) { return tup; }, args.begin()...)
-    //   , _end([](auto tup) { return tup; }, args.end()...){};
+    using it_begin = zip_iterator<Func, tup_it_begin>;
+    using it_end = zip_iterator<Func, tup_it_end>;
 
-    constexpr zip_impl(T func, Args && ... args)
-      : _begin(func, args.begin()...)
-      , _end(func, args.end()...)
-      , _args{args...}
-      , _func{func} {};
+    explicit constexpr zip_impl(Func && func, Args && ... args)
+      : _begin{std::forward<Func>(func), std::forward_as_tuple(args.begin()...)}
+      , _end{std::forward<Func>(func), std::forward_as_tuple(args.end()...)}
+      , tup_args{args...}
+      , func{func} {};
 
     zip_impl& operator=(const zip_impl& rhs) = default;
 
-    template<class S>
-    auto operator|(S funk)
+    template<class Funky>
+    auto operator|(Funky&& funk)
     {
-        return index_apply<N>(
-          [&](auto... Ixs) { return zip_f(funk, std::get<Ixs>(_args)...); });
-    };
+        auto func = [&](auto&&... _args) {
+            return zip_f(std::forward<Funky>(funk),
+                         std::forward<decltype(_args)>(_args)...);
+        };
+        return tupletools::apply(std::forward<decltype(func)>(func),
+                                 std::forward<decltype(this->tup_args)>(
+                                   this->tup_args));
+    }
 
     ~zip_impl() = default;
 
@@ -481,11 +503,22 @@ class [[nodiscard]] zip_impl
     it_end end() { return _end; }
 
   private:
-    T _func;
-    std::tuple<Args...> _args;
+    Func func;
+    std::tuple<Args...> tup_args;
+
     it_begin _begin;
     it_end _end;
 };
+
+template<class Func,
+         class... Args,
+         std::enable_if_t<!(tupletools::is_tupleoid_v<Args> || ...), int> = 0>
+constexpr auto
+zip_f(Func func, Args&&... args)
+{
+    return zip_impl<Func, Args...>(std::forward<Func>(func),
+                                   std::forward<Args>(args)...);
+}
 }; // namespace detail
 
 /*
@@ -504,17 +537,6 @@ zip(Args&&... args)
                                      std::forward<Args>(args)...);
 }
 
-template<class T,
-         class... Args,
-         std::enable_if_t<!(tupletools::is_tupleoid_v<Args> || ...), int> = 0>
-constexpr auto
-zip_f(T func, Args&&... args)
-{
-
-    return detail::zip_impl<T, Args...>(std::forward<T>(func),
-                                        std::forward<Args>(args)...);
-}
-
 // template<class Args, std::enable_if_t<tupletools::is_tupleoid_v<Args>, int> =
 // 0> constexpr auto zip(Args&& args)
 // {
@@ -525,6 +547,97 @@ zip_f(T func, Args&&... args)
 //     return tupletools::apply(std::forward<decltype(args)>(args),
 //                              std::forward<decltype(func)>(func));
 // }
+
+namespace toast {
+namespace detail {
+template<class... Args>
+class concat_impl;
+
+template<class Tup>
+class concat_iterator
+{
+  public:
+    using iterator_category = std::forward_iterator_tag;
+
+    explicit constexpr concat_iterator(Tup tup_args) noexcept
+      : tup_args{tup_args}
+    {}
+
+    constexpr auto operator++() { ++std::get<0>(tup_args); }
+
+    template<class Tupe>
+    constexpr bool operator==(concat_iterator<Tupe>& rhs)
+    {
+        auto b = std::get<0>(this->tup_args) == std::get<0>(rhs.tup_args);
+
+        if (b) {
+            tupletools::roll(tup_args, true);
+            tupletools::roll(rhs.tup_args, true);
+
+            b = std::get<0>(this->tup_args) == std::get<0>(rhs.tup_args);
+        }
+        return b;
+    }
+
+    template<class Tupe>
+    constexpr bool operator!=(concat_iterator<Tupe>& rhs)
+    {
+        return !(*this == rhs);
+    }
+
+    constexpr auto operator*() noexcept { return *std::get<0>(this->tup_args); }
+    constexpr auto operator-> () noexcept { return this->tup_args; }
+
+    Tup tup_args;
+};
+
+template<class... Args>
+class [[nodiscard]] concat_impl
+{
+    static constexpr size_t N = sizeof...(Args);
+    static_assert(N > 0, "!");
+
+  public:
+    using tup_it_begin = std::tuple<decltype(std::declval<Args>().begin())...>;
+    using tup_it_end = std::tuple<decltype(std::declval<Args>().end())...>;
+
+    using it_begin = concat_iterator<tup_it_begin>;
+    using it_end = concat_iterator<tup_it_end>;
+
+    explicit constexpr concat_impl(Args && ... args)
+      : _begin{std::forward_as_tuple(args.begin()...)}
+      , _end{std::forward_as_tuple(args.end()...)}
+      , tup_args{args...} {};
+
+    concat_impl& operator=(const concat_impl& rhs) = default;
+
+    ~concat_impl() = default;
+
+    it_begin begin() { return _begin; }
+    it_end end() { return _end; }
+
+  private:
+    std::tuple<Args...> tup_args;
+
+    it_begin _begin;
+    it_end _end;
+};
+
+}; // namespace detail
+
+/*
+Zips an arbitrary number of iterables together into one iterable container. Each
+iterable herein must provide begin and end member functions (whereof are used to
+iterate upon each iterable within the container).
+ */
+template<class... Args,
+         std::enable_if_t<!(tupletools::is_tupleoid_v<Args> || ...), int> = 0>
+constexpr auto
+concat(Args&&... args)
+{
+    return detail::concat_impl<Args...>(std::forward<Args>(args)...);
+}
+}
 
 /*
 

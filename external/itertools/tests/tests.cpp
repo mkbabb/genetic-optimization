@@ -794,26 +794,28 @@ main()
 
     frexp_tests();
 
-    std::vector<int> me1 = {1, 2, 3, 4, 5, 6};
-    std::vector<int> me2 = {10, 9, 8, 7, 6, 5};
-    std::vector<int> me3 = {10, 9, 8, 7, 6, 5};
+    std::vector<int> v1 = {1, 2};
+    std::vector<int> v2 = {10, 9};
+    std::vector<int> v3 = {7, 6};
 
-    auto tmp = itertools::enumerate(me1);
+    auto tmp = itertools::enumerate(v1);
 
-    auto ko = itertools::zip(me1, itertools::zip(me2)) | [](auto tup) {
-        std::get<0>(tup) *= 100;
-        return tup;
-    };
+    auto l1 = std::list<float>{1.2, 1.2, 1.2};
 
-    for (auto v : ko) {
-        std::cout << "hi" << std::endl;
-    }
+    auto ko = itertools::zip(v1, l1);
 
-    // for (auto v : itertools::zip(itertools::zip(me1, me2), me3)) {
+    // for (auto v : ko) {
     //     std::cout << "hi" << std::endl;
-    //     auto [n, i, j] = tupletools::flatten(v);
-    //     // std::cout << fmt::format("{}, {}", n, i) << std::endl;
     // }
+
+    auto tomp = std::make_tuple('a', 'b', 'c', 'd');
+    auto tmp2 = tupletools::roll(tomp);
+
+    auto cat = itertools::toast::concat(tmp, itertools::enumerate(v2));
+
+    for (auto i : cat) {
+        std::cout << "him" << std::endl; 
+    };
 
     // pow_tests();
 
