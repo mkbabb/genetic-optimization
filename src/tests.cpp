@@ -80,33 +80,37 @@ main(int argc, char** argv)
                        cxxopts::value<int>()->default_value(
                          "150"))("population_count",
                                  "Population count",
-                                 cxxopts::value<int>()->default_value("100"))(
-        "mutation_rate",
-        "Mutation rate",
+                                 cxxopts::value<int>()->default_value(
+                                   "100"))("mutation_rate",
+                                           "Mutation rate",
+                                           cxxopts::value<int>()->default_value(
+                                             "1"))(
+        "mutation_threshold_low",
+        "Mutation threshold low",
         cxxopts::value<int>()->default_value(
-          "1"))("mutation_threshold_low",
-                "Mutation threshold low",
-                cxxopts::value<int>()->default_value(
-                  "100000"))("mutation_threshold_high",
-                             "Mutation threshold high",
-                             cxxopts::value<int>()->default_value(
-                               "1000000"))("parent_count",
-                                           "Parent count",
+          "100000"))("mutation_threshold_high",
+                     "Mutation threshold high",
+                     cxxopts::value<int>()->default_value(
+                       "1000000"))("parent_count",
+                                   "Parent count",
+                                   cxxopts::value<int>()->default_value(
+                                     "2"))("crossover_count",
+                                           "Crossover count",
                                            cxxopts::value<int>()->default_value(
                                              "2"))(
-        "crossover_count",
-        "Crossover count",
+        "mating_pool_count",
+        "Mating pool count",
         cxxopts::value<int>()->default_value(
-          "2"))("mating_pool_count",
-                "Mating pool count",
-                cxxopts::value<int>()->default_value(
-                  "10"))("iterations",
-                         "Iterations",
-                         cxxopts::value<int>()->default_value(
-                           "1000000"))("rng_state",
-                                       "Random number generator state",
-                                       cxxopts::value<int>()->default_value(
-                                         "-1"));
+          "10"))("iterations",
+                 "Iterations",
+                 cxxopts::value<int>()->default_value(
+                   "1000000"))("rng_state",
+                               "Random number generator state",
+                               cxxopts::value<int>()->default_value(
+                                 "-1"))("current_best",
+                                        "Current best value to optimize",
+                                        cxxopts::value<double>()->default_value(
+                                          "-1"));
 
     auto result = options.parse(argc, argv);
 
@@ -132,5 +136,6 @@ main(int argc, char** argv)
                      result["crossover_count"].as<int>(),
                      result["mating_pool_count"].as<int>(),
                      result["iterations"].as<int>(),
-                     rng_state);
+                     rng_state,
+                     result["current_best"].as<double>());
 }

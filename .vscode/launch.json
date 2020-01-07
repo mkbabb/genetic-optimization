@@ -55,9 +55,9 @@
                 "--load_file",
                 "",
                 "--bucket_count",
-                "4",
+                "3",
                 "--population_count",
-                "1000",
+                "10",
                 "--max_bucket",
                 "280",
                 "--parent_count",
@@ -75,7 +75,9 @@
                 "--iterations",
                 "10000000",
                 "--rng_state",
-                "1"
+                "1",
+                "--current_best",
+                "10764931.82"
             ],
             "cwd": "${workspaceFolder}",
             "terminal": "integrated"

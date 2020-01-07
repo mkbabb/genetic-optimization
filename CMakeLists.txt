@@ -12,7 +12,7 @@ set(COMPILE_FLAGS "-fcoroutines-ts -stdlib=libc++ -std=c++2a")
 add_definitions(${COMPILE_FLAGS})
 # add_definitions(${LINK_FLAGS})
 
-add_executable(${PROJECT_NAME} external/itertools/tests/tests.cpp)
+add_executable(${PROJECT_NAME} src/tests.cpp)
 # target_link_libraries(${PROJECT_NAME} PRIVATE sqlite3)
 
 
