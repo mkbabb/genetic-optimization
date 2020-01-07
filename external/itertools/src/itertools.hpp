@@ -432,7 +432,7 @@ class zip_iterator
   public:
     using iterator_category = std::forward_iterator_tag;
 
-    explicit constexpr zip_iterator(Func func, Tup tup_args) noexcept
+    explicit constexpr zip_iterator(Func&& func, Tup&& tup_args) noexcept
       : func{func}
       , tup_args{tup_args}
     {}
@@ -457,7 +457,10 @@ class zip_iterator
         return !(*this == rhs);
     }
 
-    constexpr auto operator*() noexcept { return deref_copy(this->tup_args); }
+    constexpr auto operator*() noexcept
+    {
+        return func(deref_copy(this->tup_args));
+    }
     constexpr auto operator-> () noexcept { return this->tup_args; }
 
     Tup tup_args;
@@ -486,15 +489,13 @@ class [[nodiscard]] zip_impl
     zip_impl& operator=(const zip_impl& rhs) = default;
 
     template<class Funky>
-    auto operator|(Funky&& funk)
+    auto operator|(Funky funk)
     {
-        auto func = [&](auto&&... _args) {
-            return zip_f(std::forward<Funky>(funk),
-                         std::forward<decltype(_args)>(_args)...);
-        };
-        return tupletools::apply(std::forward<decltype(func)>(func),
-                                 std::forward<decltype(this->tup_args)>(
-                                   this->tup_args));
+        return tupletools::index_apply<N>([&](auto... Ixs) {
+            return zip_impl<Funky, Args...>(std::forward<Funky>(funk),
+                                            std::forward<Args>(
+                                              std::get<Ixs>(tup_args))...);
+        });
     }
 
     ~zip_impl() = default;
@@ -510,15 +511,6 @@ class [[nodiscard]] zip_impl
     it_end _end;
 };
 
-template<class Func,
-         class... Args,
-         std::enable_if_t<!(tupletools::is_tupleoid_v<Args> || ...), int> = 0>
-constexpr auto
-zip_f(Func func, Args&&... args)
-{
-    return zip_impl<Func, Args...>(std::forward<Func>(func),
-                                   std::forward<Args>(args)...);
-}
 }; // namespace detail
 
 /*
@@ -537,36 +529,25 @@ zip(Args&&... args)
                                      std::forward<Args>(args)...);
 }
 
-// template<class Args, std::enable_if_t<tupletools::is_tupleoid_v<Args>, int> =
-// 0> constexpr auto zip(Args&& args)
-// {
-//     auto func = [&](auto&&... _args) {
-//         return detail::zip_impl<decltype(_args)...>(
-//           std::forward<decltype(_args)>(_args)...);
-//     };
-//     return tupletools::apply(std::forward<decltype(args)>(args),
-//                              std::forward<decltype(func)>(func));
-// }
-
-namespace toast {
 namespace detail {
-template<class... Args>
+template<class Func, class... Args>
 class concat_impl;
 
-template<class Tup>
+template<class Func, class Tup>
 class concat_iterator
 {
   public:
     using iterator_category = std::forward_iterator_tag;
 
-    explicit constexpr concat_iterator(Tup tup_args) noexcept
-      : tup_args{tup_args}
+    explicit constexpr concat_iterator(Func&& func, Tup&& tup_args) noexcept
+      : func{func}
+      , tup_args{tup_args}
     {}
 
     constexpr auto operator++() { ++std::get<0>(tup_args); }
 
-    template<class Tupe>
-    constexpr bool operator==(concat_iterator<Tupe>& rhs)
+    template<class Funk, class Tupe>
+    constexpr bool operator==(concat_iterator<Funk, Tupe>& rhs)
     {
         auto b = std::get<0>(this->tup_args) == std::get<0>(rhs.tup_args);
 
@@ -579,19 +560,24 @@ class concat_iterator
         return b;
     }
 
-    template<class Tupe>
-    constexpr bool operator!=(concat_iterator<Tupe>& rhs)
+    template<class Funk, class Tupe>
+    constexpr bool operator!=(concat_iterator<Funk, Tupe>& rhs)
     {
         return !(*this == rhs);
     }
 
-    constexpr auto operator*() noexcept { return *std::get<0>(this->tup_args); }
+    constexpr auto operator*() noexcept
+    {
+        // Potentially forward this.
+        return func(*std::get<0>(this->tup_args));
+    }
     constexpr auto operator-> () noexcept { return this->tup_args; }
 
     Tup tup_args;
+    Func func;
 };
 
-template<class... Args>
+template<class Func, class... Args>
 class [[nodiscard]] concat_impl
 {
     static constexpr size_t N = sizeof...(Args);
@@ -601,15 +587,26 @@ class [[nodiscard]] concat_impl
     using tup_it_begin = std::tuple<decltype(std::declval<Args>().begin())...>;
     using tup_it_end = std::tuple<decltype(std::declval<Args>().end())...>;
 
-    using it_begin = concat_iterator<tup_it_begin>;
-    using it_end = concat_iterator<tup_it_end>;
+    using it_begin = concat_iterator<Func, tup_it_begin>;
+    using it_end = concat_iterator<Func, tup_it_end>;
 
-    explicit constexpr concat_impl(Args && ... args)
-      : _begin{std::forward_as_tuple(args.begin()...)}
-      , _end{std::forward_as_tuple(args.end()...)}
-      , tup_args{args...} {};
+    explicit constexpr concat_impl(Func && func, Args && ... args)
+      : _begin{std::forward<Func>(func), std::forward_as_tuple(args.begin()...)}
+      , _end{std::forward<Func>(func), std::forward_as_tuple(args.end()...)}
+      , tup_args{args...}
+      , func{func} {};
 
     concat_impl& operator=(const concat_impl& rhs) = default;
+
+    template<class Funky>
+    auto operator|(Funky funk)
+    {
+        return tupletools::index_apply<N>([&](auto... Ixs) {
+            return concat_impl<Funky, Args...>(std::forward<Funky>(funk),
+                                               std::forward<Args>(
+                                                 std::get<Ixs>(tup_args))...);
+        });
+    }
 
     ~concat_impl() = default;
 
@@ -617,26 +614,28 @@ class [[nodiscard]] concat_impl
     it_end end() { return _end; }
 
   private:
+    Func func;
     std::tuple<Args...> tup_args;
 
     it_begin _begin;
     it_end _end;
 };
-
 }; // namespace detail
 
 /*
-Zips an arbitrary number of iterables together into one iterable container. Each
-iterable herein must provide begin and end member functions (whereof are used to
-iterate upon each iterable within the container).
+Concatenates an arbitrary number of iterables together into one iterable
+container. Each iterable herein must provide begin and end member functions
+(whereof are used to iterate upon each iterable within the container).
  */
 template<class... Args,
          std::enable_if_t<!(tupletools::is_tupleoid_v<Args> || ...), int> = 0>
 constexpr auto
 concat(Args&&... args)
 {
-    return detail::concat_impl<Args...>(std::forward<Args>(args)...);
-}
+    auto func = [](auto tup) { return tup; };
+    return detail::concat_impl<decltype(func),
+                               Args...>(std::forward<decltype(func)>(func),
+                                        std::forward<Args>(args)...);
 }
 
 /*
@@ -1109,9 +1108,9 @@ struct to_string_impl
                                       Formatter&& formatter,
                                       std::string& sep)
 
-      : _formatter(formatter)
-      , _sep(sep)
-      , _trim_sep(trim(sep))
+      : _formatter{formatter}
+      , _sep{sep}
+      , _trim_sep{trim(sep)}
     {
         _ndim = get_ndim(iter);
     };
@@ -1218,14 +1217,13 @@ struct to_string_impl
         std::string buff = "";
         size_t ndim = iter.size();
 
-        itertools::for_each(iter, [&](auto n, auto&& iter_n) {
+        for (auto [n, iter_n] : itertools::enumerate(iter)) {
             buff += recurse(std::forward<decltype(iter_n)>(iter_n), ix + 1);
             if (!is_iterable_v<decltype(iter_n)> &&
                 !is_tupleoid_v<decltype(iter_n)>) {
                 buff += n < ndim - 1 ? _sep : "";
             }
-            return false;
-        });
+        };
 
         buff = _prev_ix > ix ? buff.substr(0, buff.size() - _prev_len) : buff;
 
@@ -1253,10 +1251,9 @@ std::string
 to_string(Iterable&& iter)
 {
     std::string sep = ", ";
+    auto formatter = [](auto&& s) -> std::string { return std::to_string(s); };
     return detail::to_string_impl{std::forward<Iterable>(iter),
-                                  [](auto& s) -> std::string {
-                                      return std::to_string(s);
-                                  },
+                                  std::forward<decltype(formatter)>(formatter),
                                   sep}(iter);
 }
 };     // namespace itertools
