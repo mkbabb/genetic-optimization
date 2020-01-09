@@ -1,0 +1,1 @@
+** bucket_count: 4, parent_count: 2, population_count: 200, crossover_count: 5
