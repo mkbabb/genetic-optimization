@@ -23,7 +23,9 @@ for bucket_count in $bucket_counts; do
     for parent_count in $parent_counts; do
         for population_count in $population_counts; do
             for crossover_count in $crossover_counts; do
-                ./erate.so -i ./data/discount_rates_invoices_10_2019.csv -o ./data/out/run-$n.csv --bucket_count $bucket_count --population_count $population_count --max_bucket $max_bucket --parent_count $parent_count --mating_pool_count $mating_pool_count --mutation_rate $mutation_rate --nuke_threshold $nuke_threshold --nuke_threshold_max $nuke_threshold_max --nuke_mutation_percent $nuke_mutation_percent --nuke_mutation_percent_max $nuke_mutation_percent_max --nuke_growth_rate $nuke_growth_rate --nuke_burnout $nuke_burnout --iterations $iterations --rng_state $n --current_best $current_best >./data/out/console-$n.txt &
+                console_out_file=./data/out/console-$n.txt
+                touch $console_out_file
+                ./erate.so -i ./data/discount_rates_invoices_10_2019.csv -o ./data/out/run-$n.csv --bucket_count $bucket_count --population_count $population_count --max_bucket $max_bucket --parent_count $parent_count --mating_pool_count $mating_pool_count --mutation_rate $mutation_rate --nuke_threshold $nuke_threshold --nuke_threshold_max $nuke_threshold_max --nuke_mutation_percent $nuke_mutation_percent --nuke_mutation_percent_max $nuke_mutation_percent_max --nuke_growth_rate $nuke_growth_rate --nuke_burnout $nuke_burnout --iterations $iterations --rng_state $n --current_best $current_best >$console_out_file &
                 ((n++))
             done
         done
