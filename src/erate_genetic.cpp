@@ -150,7 +150,7 @@ calc_critter_fitness(std::vector<erate_t>& erate_data,
                   bucket["total_discount"] / (bucket["count"] * 100);
 
                 bucket["average_discount"] =
-                  double_round(bucket["average_discount"], 3);
+                  double_round(bucket["average_discount"], 2);
 
                 bucket["discount_cost"] =
                   bucket["average_discount"] * bucket["total_cost"];

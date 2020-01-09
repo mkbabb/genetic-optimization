@@ -4,6 +4,7 @@ parent_counts="2 5"
 population_counts="100 200"
 crossover_counts="5"
 n=0
+
 mating_pool_count=100
 max_bucket=200
 mutation_rate=1

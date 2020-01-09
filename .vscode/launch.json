@@ -55,7 +55,7 @@
                 "--load_file",
                 "",
                 "--bucket_count",
-                "6",
+                "5",
                 "--population_count",
                 "200",
                 "--max_bucket",
