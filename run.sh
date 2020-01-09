@@ -1,5 +1,4 @@
 #!/bin/bash
-
 bucket_counts="4 5"
 parent_counts="2 5"
 population_counts="100 200"
@@ -18,6 +17,8 @@ nuke_burnout=1
 
 iterations=10000000
 current_best=10764931.82
+
+mkdir ./data/out
 
 for bucket_count in $bucket_counts; do
     for parent_count in $parent_counts; do
