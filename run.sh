@@ -1,14 +1,31 @@
 #!/bin/bash
-parents="2 5 10"
+
+bucket_counts="4 5"
+parent_counts="2 5"
+population_counts="100 200"
+crossover_counts="5"
 n=0
-for i in {3..5}
-do
-    for j in $parents
-    do
-        for k in {1..2}
-        do
-            ./erate.so -i ./data/erate-2019-start.csv -o ./data/out-$n.csv --bucket_count $i --population_count 200 --max_bucket 200 --parent_count $j --mating_pool_count 20 --mutation_rate $k --mutation_threshold_low 100000 --mutation_threshold_high 500000 --iterations 100000000 > ./data/console-$n.txt &
-            ((n++))
+mating_pool_count=100
+max_bucket=200
+mutation_rate=1
+
+nuke_threshold=100
+nuke_threshold_max=100000
+nuke_mutation_percent=10
+nuke_mutation_percent_max=90
+nuke_growth_rate=2
+nuke_burnout=1
+
+iterations=10000000
+current_best=10764931.82
+
+for bucket_count in $bucket_counts; do
+    for parent_count in $parent_counts; do
+        for population_count in $population_counts; do
+            for crossover_count in $crossover_counts; do
+                ./erate.so -i ./data/discount_rates_invoices_10_2019.csv -o ./data/out/run-$n.csv --bucket_count $bucket_count --population_count $population_count --max_bucket $max_bucket --parent_count $parent_count --mating_pool_count $mating_pool_count --mutation_rate $mutation_rate --nuke_threshold $nuke_threshold --nuke_threshold_max $nuke_threshold_max --nuke_mutation_percent $nuke_mutation_percent --nuke_mutation_percent_max $nuke_mutation_percent_max --nuke_growth_rate $nuke_growth_rate --nuke_burnout $nuke_burnout --iterations $iterations --rng_state $n --current_best $current_best >./data/out/console-$n.txt &
+                ((n++))
+            done
         done
     done
 done

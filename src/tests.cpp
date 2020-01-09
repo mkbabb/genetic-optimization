@@ -80,37 +80,47 @@ main(int argc, char** argv)
                        cxxopts::value<int>()->default_value(
                          "150"))("population_count",
                                  "Population count",
-                                 cxxopts::value<int>()->default_value(
-                                   "100"))("mutation_rate",
-                                           "Mutation rate",
-                                           cxxopts::value<int>()->default_value(
-                                             "1"))(
-        "mutation_threshold_low",
-        "Mutation threshold low",
+                                 cxxopts::value<int>()->default_value("100"))(
+        "mutation_rate",
+        "Mutation rate",
         cxxopts::value<int>()->default_value(
-          "100000"))("mutation_threshold_high",
-                     "Mutation threshold high",
-                     cxxopts::value<int>()->default_value(
-                       "1000000"))("parent_count",
-                                   "Parent count",
-                                   cxxopts::value<int>()->default_value(
-                                     "2"))("crossover_count",
-                                           "Crossover count",
-                                           cxxopts::value<int>()->default_value(
-                                             "2"))(
-        "mating_pool_count",
-        "Mating pool count",
+          "1"))("parent_count",
+                "Parent count",
+                cxxopts::value<int>()->default_value(
+                  "2"))("crossover_count",
+                        "Crossover count",
+                        cxxopts::value<int>()->default_value(
+                          "2"))("mating_pool_count",
+                                "Mating pool count",
+                                cxxopts::value<int>()->default_value(
+                                  "10"))("iterations",
+                                         "Iterations",
+                                         cxxopts::value<int>()->default_value(
+                                           "1000000"))(
+        "rng_state",
+        "Random number generator state",
         cxxopts::value<int>()->default_value(
-          "10"))("iterations",
-                 "Iterations",
-                 cxxopts::value<int>()->default_value(
-                   "1000000"))("rng_state",
-                               "Random number generator state",
-                               cxxopts::value<int>()->default_value(
-                                 "-1"))("current_best",
-                                        "Current best value to optimize",
-                                        cxxopts::value<double>()->default_value(
-                                          "-1"));
+          "-1"))("current_best",
+                 "Current best value to optimize",
+                 cxxopts::value<double>()->default_value(
+                   "-1"))("nuke_threshold",
+                          "nuke factor low",
+                          cxxopts::value<int>()->default_value(
+                            "5"))("nuke_threshold_max",
+                                  "nuke factor low",
+                                  cxxopts::value<int>()->default_value("5000"))(
+        "nuke_mutation_percent",
+        "nuke factor low",
+        cxxopts::value<int>()->default_value(
+          "2"))("nuke_mutation_percent_max",
+                "nuke factor low",
+                cxxopts::value<int>()->default_value(
+                  "2"))("nuke_growth_rate",
+                        "nuke threshold",
+                        cxxopts::value<int>()->default_value(
+                          "2"))("nuke_burnout",
+                                "nuke threshold",
+                                cxxopts::value<int>()->default_value("10"));
 
     auto result = options.parse(argc, argv);
 
@@ -129,9 +139,16 @@ main(int argc, char** argv)
                      result["bucket_count"].as<int>(),
                      result["max_bucket"].as<int>(),
                      result["population_count"].as<int>(),
+
                      result["mutation_rate"].as<int>(),
-                     result["mutation_threshold_low"].as<int>(),
-                     result["mutation_threshold_high"].as<int>(),
+
+                     result["nuke_threshold"].as<int>(),
+                     result["nuke_threshold_max"].as<int>(),
+                     result["nuke_mutation_percent"].as<int>(),
+                     result["nuke_mutation_percent_max"].as<int>(),
+                     result["nuke_growth_rate"].as<int>(),
+                     result["nuke_burnout"].as<int>(),
+
                      result["parent_count"].as<int>(),
                      result["crossover_count"].as<int>(),
                      result["mating_pool_count"].as<int>(),

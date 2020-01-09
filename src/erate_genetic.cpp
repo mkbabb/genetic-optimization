@@ -270,15 +270,15 @@ get_critter_subset(std::vector<Critter>& critters,
 
 template<typename T>
 void
-mutate_critters(std::vector<erate_t>& erate_data,
-                std::vector<Critter*>& critters,
+mutate_critters(std::vector<Critter*>& critters,
                 size_t bucket_count,
                 size_t mutation_count,
                 T& rng)
 {
+    auto gene_size = critters[0]->genes().size();
     for (auto& critter : critters) {
         for (auto i : itertools::range(mutation_count)) {
-            auto r = rng.randrange(0, erate_data.size());
+            auto r = rng.randrange(0, gene_size);
             auto b = rng.randrange(0, bucket_count);
             critter->genes()[r] = b;
         }
@@ -333,7 +333,7 @@ mate(std::vector<erate_t>& erate_data,
                           erate_data.size(),
                           rng);
 
-        mutate_critters(erate_data, t_children, bucket_count, 1, rng);
+        mutate_critters(t_children, bucket_count, 1, rng);
     }
     bool randomize = false;
 
@@ -356,7 +356,6 @@ max_critter_to_csv(std::vector<erate_t>& erate_data,
                    std::string& out_file,
                    std::ofstream& ofs,
                    size_t i,
-                   size_t max_gap,
                    double current_best)
 {
     ofs.open(out_file, std::ios::trunc);
@@ -364,10 +363,9 @@ max_critter_to_csv(std::vector<erate_t>& erate_data,
     auto max_delta = max_critter.fitness() - prev_max_fitness;
     auto total_savings = max_critter.fitness() - current_best;
 
-    std::cout << fmt::format("i: {0:n}; max-gap: {1:n}; max-fitness: {2:.3f}; "
-                             "max-delta: {3:.3f}; total-savings: {4:.3f}\n",
+    std::cout << fmt::format("i: {0:n}; max-fitness: {1:.3f}; "
+                             "max-delta: {2:.3f}; total-savings: {3:.3f}\n",
                              i,
-                             max_gap,
                              max_critter.fitness(),
                              max_delta,
                              total_savings);
@@ -389,16 +387,57 @@ max_critter_to_csv(std::vector<erate_t>& erate_data,
     ofs.close();
 }
 
+template<class T>
+std::tuple<size_t, size_t>
+nuke_critters(std::vector<Critter>& critters,
+              size_t bucket_count,
+              size_t nuke_threshold,
+              size_t nuke_threshold_max,
+              size_t nuke_mutation_percent,
+              size_t nuke_mutation_percent_max,
+              size_t nuke_growth_rate,
+              T& rng)
+{
+    auto nuke_count =
+      static_cast<int>(critters.size() * nuke_mutation_percent / 100.0);
+    auto mutation_count = critters[0].genes().size();
+
+    std::cout << fmt::format("**Nuked {} critters with a threshold of {}\n",
+                             nuke_count,
+                             nuke_threshold);
+
+    std::vector<Critter*> critter_subset(nuke_count);
+    get_critter_subset(critters, critter_subset, nuke_count, rng);
+
+    mutate_critters(critter_subset, bucket_count, mutation_count, rng);
+
+    nuke_threshold =
+      std::min(nuke_threshold * nuke_growth_rate, nuke_threshold_max);
+    nuke_mutation_percent = std::min(nuke_mutation_percent * nuke_growth_rate,
+                                     nuke_mutation_percent_max);
+
+    return {nuke_threshold, nuke_mutation_percent};
+}
+
 void
 optimize_buckets(std::vector<erate_t>& erate_data,
+
                  std::string out_file,
                  std::string load_file,
+
                  size_t bucket_count,
                  size_t max_bucket,
                  size_t population_count,
+
                  size_t mutation_rate,
-                 size_t mutation_threshold_low,
-                 size_t mutation_threshold_high,
+
+                 size_t nuke_threshold,
+                 size_t nuke_threshold_max,
+                 size_t nuke_mutation_percent,
+                 size_t nuke_mutation_percent_max,
+                 size_t nuke_growth_rate,
+                 size_t nuke_burnout,
+
                  size_t parent_count,
                  size_t crossover_count,
                  size_t mating_pool_count,
@@ -411,7 +450,6 @@ optimize_buckets(std::vector<erate_t>& erate_data,
     bool randomize = true;
 
     std::vector<Critter> critters(population_count, {erate_data.size()});
-    std::vector<Critter*> critter_subset(mating_pool_count);
 
     random_v::Random rng(rng_state, random_v::lcg_xor_rot);
 
@@ -431,9 +469,12 @@ optimize_buckets(std::vector<erate_t>& erate_data,
     mating_pool_count = std::min(mating_pool_count, population_count);
     parent_count = std::min(parent_count, mating_pool_count);
     max_bucket = std::min(erate_data.size(), max_bucket);
-    crossover_count = std::max(parent_count + 1, crossover_count);
+    crossover_count = std::min(erate_data.size() - 1, crossover_count);
 
-    auto prev_max_fitness = 0.0;
+    // Change this layout to make more consistent.
+    nuke_threshold = std::min(nuke_threshold, nuke_threshold_max);
+    nuke_mutation_percent =
+      std::min(nuke_mutation_percent, nuke_mutation_percent_max);
 
     std::map<size_t, std::map<std::string, double>> buckets;
     for (auto i : itertools::range(bucket_count)) {
@@ -450,31 +491,18 @@ optimize_buckets(std::vector<erate_t>& erate_data,
 
     std::vector<size_t> crossover_distb(crossover_count, 0);
 
-    auto max_gap = 0;
+    auto prev_max_fitness = 0.0;
+    auto nuke_counter = 0;
+    auto t_nuke_threshold = nuke_threshold;
+    auto t_nuke_mutation_percent = nuke_mutation_percent;
 
     for (auto i : itertools::range(iterations)) {
-        if (max_gap > mutation_threshold_low) {
-            get_critter_subset(critters,
-                               critter_subset,
-                               critter_subset.size(),
-                               rng);
-            mutate_critters(erate_data,
-                            critter_subset,
-                            bucket_count,
-                            mutation_count,
-                            rng);
-            max_gap = 0;
-        } else {
-            max_gap++;
-        }
-
         calc_pool_fitness(erate_data,
                           buckets,
                           critters,
                           max_bucket,
                           &randomize,
                           rng);
-
         auto& max_critter = critters[0];
 
         if (prev_max_fitness < max_critter.fitness()) {
@@ -484,11 +512,27 @@ optimize_buckets(std::vector<erate_t>& erate_data,
                                out_file,
                                ofs,
                                i,
-                               max_gap,
                                current_best);
 
             prev_max_fitness = max_critter.fitness();
-            max_gap = 0;
+            nuke_counter = 0;
+
+            t_nuke_threshold = nuke_threshold;
+            t_nuke_mutation_percent = nuke_mutation_percent;
+        } else {
+            if (nuke_counter > t_nuke_threshold) {
+                std::tie(t_nuke_threshold, t_nuke_mutation_percent) =
+                  nuke_critters(critters,
+                                bucket_count,
+                                t_nuke_threshold,
+                                nuke_threshold_max,
+                                t_nuke_mutation_percent,
+                                nuke_mutation_percent_max,
+                                nuke_growth_rate,
+                                rng);
+                nuke_counter = 0;
+            }
+            nuke_counter++;
         }
 
         mate(erate_data,
