@@ -4,9 +4,7 @@ project(erate_analysis VERSION 0.1.0)
 
 set(CMAKE_CXX_COMPILER "/usr/local/Cellar/llvm/9.0.0_1/bin/clang++")
 
-set(COMPILE_FLAGS "-fcoroutines-ts -stdlib=libc++ -std=c++2a -O3")
-
-# -O1 -fno-signed-zeros -freciprocal-math -ffp-contract=fast -fno-trapping-math -ffast-math -ffinite-math-only
+set(COMPILE_FLAGS "-fcoroutines-ts -stdlib=libc++ -std=c++2a -Ofast")
 
 
 add_definitions(${COMPILE_FLAGS})

@@ -202,11 +202,15 @@ proportionate_selection(std::vector<Critter>& critters,
 {
     std::map<int, int> probability_dict;
 
+    // auto base = pow(e, 5);
+
     auto total_fitness = 0.0;
     for (auto& critter : critters) {
-        auto g_fitness = pow((critter.fitness() / max_fitness), 100);
+        // auto g_fitness = pow((critter.fitness() / max_fitness), 100);
+        auto n_fitness = critter.fitness() / max_fitness;
+        // auto g_fitness = pow(base, n_fitness) / base;
 
-        critter.fitness(g_fitness);
+        critter.fitness(n_fitness);
         total_fitness += critter.fitness();
     }
 
@@ -247,7 +251,7 @@ k_point_crossover(std::vector<Critter*>& parents,
         for (auto [n, j] : itertools::enumerate(parent_ixs)) {
             auto k = start;
             while (k++ < end) {
-                children[j]->genes()[k] = parents[n]->genes()[k];
+                children[n]->genes()[k] = parents[j]->genes()[k];
             }
         }
         itertools::roll(parent_ixs);
@@ -332,9 +336,12 @@ mate(std::vector<erate_t>& erate_data,
                           crossover_count,
                           erate_data.size(),
                           rng);
-
-        mutate_critters(t_children, bucket_count, 1, rng);
     }
+
+    std::vector<Critter*> subset(children.size());
+    get_critter_subset(children, subset, children.size(), rng);
+    mutate_critters(subset, bucket_count, mutation_count, rng);
+
     bool randomize = false;
 
     calc_pool_fitness(erate_data,
