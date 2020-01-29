@@ -1,9 +1,9 @@
 #!/bin/bash
 in_file="./data/2020optimization.csv"
 
-bucket_counts="4 5"
-parent_counts="2 5"
-population_counts="100 200"
+bucket_counts="4"
+parent_counts="2 5 10"
+population_counts="500 1000"
 crossover_counts="5"
 n=0
 
@@ -11,7 +11,7 @@ mating_pool_count=100
 max_bucket=200
 mutation_rate=1
 
-nuke_threshold=1000
+nuke_threshold=100
 nuke_threshold_max=100000
 nuke_mutation_percent=10
 nuke_mutation_percent_max=90
@@ -19,7 +19,7 @@ nuke_growth_rate=2
 nuke_burnout=1
 
 iterations=10000000
-current_best=10764931.82
+current_best=11271171.92
 
 out_dir=./data/$(date +%s)
 mkdir -p $out_dir
@@ -30,7 +30,7 @@ for bucket_count in $bucket_counts; do
             for crossover_count in $crossover_counts; do
 
                 console_out_file=$out_dir/console-$n.txt
-                description_file=$out_dir/description-$0.txt
+                description_file=$out_dir/description-$n.txt
 
                 touch $console_out_file
                 touch $description_file
