@@ -26,7 +26,7 @@ constexpr int MAX_2015 = 11'810'384;
 constexpr int MAX_2019 = 15'034'520;
 constexpr int MAX_2019_6 = 10'764'932;
 
-constexpr int PROPORTIANATE_PRECISION = 100'000;
+constexpr int PROPORTIANATE_PRECISION = 1000;
 
 auto GAUSSIAN_SQRT2_INV = gaussian(1, sqrt2, 1, 0, sqrt2_2, true);
 
@@ -202,15 +202,15 @@ proportionate_selection(std::vector<Critter>& critters,
 {
     std::map<int, int> probability_dict;
 
-    // auto base = pow(e, 5);
+    auto base = pow(e, 5);
 
     auto total_fitness = 0.0;
     for (auto& critter : critters) {
         // auto g_fitness = pow((critter.fitness() / max_fitness), 100);
         auto n_fitness = critter.fitness() / max_fitness;
-        // auto g_fitness = pow(base, n_fitness) / base;
+        auto g_fitness = pow(base, n_fitness) / base;
 
-        critter.fitness(n_fitness);
+        critter.fitness(g_fitness);
         total_fitness += critter.fitness();
     }
 
