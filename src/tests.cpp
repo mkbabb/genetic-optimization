@@ -117,7 +117,7 @@ main(int argc, char** argv)
                 cxxopts::value<int>()->default_value(
                   "2"))("nuke_growth_rate",
                         "nuke threshold",
-                        cxxopts::value<int>()->default_value(
+                        cxxopts::value<double>()->default_value(
                           "2"))("nuke_burnout",
                                 "nuke threshold",
                                 cxxopts::value<int>()->default_value("10"));
@@ -146,7 +146,7 @@ main(int argc, char** argv)
                      result["nuke_threshold_max"].as<int>(),
                      result["nuke_mutation_percent"].as<int>(),
                      result["nuke_mutation_percent_max"].as<int>(),
-                     result["nuke_growth_rate"].as<int>(),
+                     result["nuke_growth_rate"].as<double>(),
                      result["nuke_burnout"].as<int>(),
 
                      result["parent_count"].as<int>(),

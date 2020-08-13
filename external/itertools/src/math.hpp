@@ -574,7 +574,6 @@ double_round(T x, int ndigits = 0) -> double
         /* if y overflows, then rounded value is exactly x */
     } else {
         pow1 = pow(10.0, (double) -ndigits);
-        pow2 = 1.0; /* unused; silences a gcc compiler warning */
         y = x / pow1;
     }
 
@@ -588,4 +587,51 @@ double_round(T x, int ndigits = 0) -> double
     else
         z *= pow1;
     return z;
+}
+
+enum class RoundMode
+{
+    round,
+    up,
+    down,
+    special
+};
+
+auto
+rround(double x, int ndigits = 1, RoundMode mode = RoundMode::round)
+{
+    auto ten = 1.0;
+    auto v = 0.0;
+
+    if (ndigits >= 0) {
+        if (ndigits < 22) {
+            ten = pow(10.0, (double) ndigits);
+        } else {
+            ten = 1.0e22;
+        }
+    }
+
+    switch (mode) {
+        case RoundMode::round:
+            v = round(x * ten);
+            break;
+        case RoundMode::up:
+            v = ceil(x * ten);
+            break;
+        case RoundMode::down:
+            v = floor(x * ten);
+            break;
+        case RoundMode::special:
+            v = x * ten;
+            auto z = floor(v);
+
+            if (abs(z - v) > 0.6) {
+                v = ceil(v);
+            } else {
+                v = floor(v);
+            }
+            break;
+    }
+
+    return v / ten;
 }

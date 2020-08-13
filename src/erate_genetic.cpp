@@ -150,7 +150,7 @@ calc_critter_fitness(std::vector<erate_t>& erate_data,
                   bucket["total_discount"] / (bucket["count"] * 100);
 
                 bucket["average_discount"] =
-                  double_round(bucket["average_discount"], 2);
+                  rround(bucket["average_discount"], 2, RoundMode::special);
 
                 bucket["discount_cost"] =
                   bucket["average_discount"] * bucket["total_cost"];
@@ -206,9 +206,9 @@ proportionate_selection(std::vector<Critter>& critters,
 
     auto total_fitness = 0.0;
     for (auto& critter : critters) {
-        // auto g_fitness = pow((critter.fitness() / max_fitness), 100);
-        auto n_fitness = critter.fitness() / max_fitness;
-        auto g_fitness = pow(base, n_fitness) / base;
+        auto g_fitness = pow((critter.fitness() / max_fitness), 100);
+        // auto n_fitness = critter.fitness() / max_fitness;
+        // auto g_fitness = pow(base, n_fitness) / base;
 
         critter.fitness(g_fitness);
         total_fitness += critter.fitness();
@@ -219,8 +219,7 @@ proportionate_selection(std::vector<Critter>& critters,
 
     for (auto [n, critter] : itertools::enumerate(critters)) {
         p = prev_p + (critter.fitness() / total_fitness);
-        probability_dict[n] =
-          static_cast<int>(ceil(p * PROPORTIANATE_PRECISION));
+        probability_dict[n] = (int) (ceil(p * PROPORTIANATE_PRECISION));
         prev_p = p;
     }
 
@@ -402,11 +401,10 @@ nuke_critters(std::vector<Critter>& critters,
               size_t nuke_threshold_max,
               size_t nuke_mutation_percent,
               size_t nuke_mutation_percent_max,
-              size_t nuke_growth_rate,
+              double nuke_growth_rate,
               T& rng)
 {
-    auto nuke_count =
-      static_cast<int>(critters.size() * nuke_mutation_percent / 100.0);
+    auto nuke_count = (int) (critters.size() * nuke_mutation_percent / 100.0);
     auto mutation_count = critters[0].genes().size();
 
     std::cout << fmt::format("**Nuked {} critters with a threshold of {}\n",
@@ -419,9 +417,10 @@ nuke_critters(std::vector<Critter>& critters,
     mutate_critters(critter_subset, bucket_count, mutation_count, rng);
 
     nuke_threshold =
-      std::min(nuke_threshold * nuke_growth_rate, nuke_threshold_max);
-    nuke_mutation_percent = std::min(nuke_mutation_percent * nuke_growth_rate,
-                                     nuke_mutation_percent_max);
+      std::min((size_t)(nuke_threshold * nuke_growth_rate), nuke_threshold_max);
+    nuke_mutation_percent =
+      std::min((size_t)(nuke_mutation_percent * nuke_growth_rate),
+               nuke_mutation_percent_max);
 
     return {nuke_threshold, nuke_mutation_percent};
 }
@@ -442,7 +441,7 @@ optimize_buckets(std::vector<erate_t>& erate_data,
                  size_t nuke_threshold_max,
                  size_t nuke_mutation_percent,
                  size_t nuke_mutation_percent_max,
-                 size_t nuke_growth_rate,
+                 double nuke_growth_rate,
                  size_t nuke_burnout,
 
                  size_t parent_count,
@@ -470,7 +469,7 @@ optimize_buckets(std::vector<erate_t>& erate_data,
     }
 
     auto mutation_count =
-      std::min(static_cast<size_t>((erate_data.size() * mutation_rate) / 100.0),
+      std::min((size_t)((erate_data.size() * mutation_rate) / 100.0),
                erate_data.size());
 
     mating_pool_count = std::min(mating_pool_count, population_count);
