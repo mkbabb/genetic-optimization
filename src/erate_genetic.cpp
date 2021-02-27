@@ -2,7 +2,7 @@
 
 #include "../external/itertools/src/itertools.hpp"
 #include "../external/itertools/src/math.hpp"
-#include "csv.hpp"
+#include "csv.h"
 #include "fmt/format.h"
 #include "random_v.hpp"
 #include "utils.cpp"

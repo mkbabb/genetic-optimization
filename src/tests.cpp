@@ -1,11 +1,7 @@
 #define FMT_HEADER_ONLY
 
 #include "../external/cxxopts.hpp"
-#include "../external/itertools/src/itertools.hpp"
 #include "./erate_genetic.cpp"
-#include "csv.hpp"
-#include "fmt/format.h"
-#include "random_v.hpp"
 
 #include <algorithm>
 #include <chrono>
