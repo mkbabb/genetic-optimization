@@ -1,11 +1,10 @@
 #define FMT_HEADER_ONLY
 
-#include "../external/csv.hpp"
-#include "../external/cxxopts.hpp"
-#include "../external/fmt/format.h"
 #include "../external/itertools/src/itertools.hpp"
 #include "../external/itertools/src/math.hpp"
-#include "../external/random_v/src/random_v.hpp"
+#include "csv.hpp"
+#include "fmt/format.h"
+#include "random_v.hpp"
 #include "utils.cpp"
 
 #include <algorithm>

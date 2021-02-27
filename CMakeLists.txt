@@ -1,17 +1,20 @@
+project(keno)
 cmake_minimum_required(VERSION 3.2)
-project(erate_analysis VERSION 0.1.0)
 
+set(CMAKE_CXX_STANDARD 20)
+add_compile_options(-Wall -Wextra)
 
-set(CMAKE_CXX_COMPILER "/usr/local/Cellar/llvm/9.0.0_1/bin/clang++")
+set(CMAKE_BUILD_TYPE "Debug")
 
-set(COMPILE_FLAGS "-fcoroutines-ts -stdlib=libc++ -std=c++2a -Ofast")
+include(${CMAKE_CURRENT_SOURCE_DIR}/conanbuildinfo.cmake)
 
+conan_basic_setup()
 
-add_definitions(${COMPILE_FLAGS})
-# add_definitions(${LINK_FLAGS})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_executable(${PROJECT_NAME} src/tests.cpp)
-# target_link_libraries(${PROJECT_NAME} PRIVATE sqlite3)
+target_link_libraries(${PROJECT_NAME} ${CONAN_LIBS})
+
 
 
 
