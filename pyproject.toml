@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "erate-optimization"
+version = "0.1.0"
+description = ""
+authors = ["Mike Babb <mike7400@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.9"
+numba = "^0.52.0"
+numpy = "^1.20.1"
+pandas = "^1.2.3"
+
+[tool.poetry.dev-dependencies]
+mypy = "^0.812"
+black = "^20.8b1"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
