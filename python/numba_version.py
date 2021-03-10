@@ -1,11 +1,10 @@
+import math
+import random
+from typing import *
+
+import numba
 import numpy as np
 import pandas as pd
-import random
-import math
-from datetime import datetime
-import numba
-import csv
-import time
 
 random.seed(1)
 np.random.seed(1)
@@ -16,13 +15,22 @@ def repeat_expand(x):
 
 
 @numba.njit(fastmath=True)
+def make_ixs(init_ixs, buckets):
+    ixs = np.full((init_ixs.size, buckets), 0)
+    for i in range(buckets):
+        mask = init_ixs == i
+        ixs[mask, i] = 1
+    return ixs
+
+
+@numba.njit(fastmath=True, parallel=False)
 def mutate(critter, mutation_p: float):
     for _ in range(mutation_p):
         r = random.randint(0, init_ixs.size - 1)
         np.random.shuffle(critter[r])
 
 
-@numba.njit(fastmath=True)
+@numba.njit(fastmath=True, parallel=False)
 def k_point_crossover(critter, k, parents):
     delta = len(costs) // (k * len(parents))
     start, end = 0, delta
@@ -40,14 +48,15 @@ def select_parents(critters, top_size):
     return [critters[random.randint(0, top_size - 1)] for _ in range(parent_count)]
 
 
-@numba.njit(fastmath=True)
+@numba.njit(fastmath=True, parallel=False)
 def cull_mating_pool(critters, fitnessess, mating_pool_size):
     total_fitness = fitnessess.sum()
 
     probs = np.cumsum(fitnessess / total_fitness)
 
     rs = np.random.random(mating_pool_size)
-    p_ixs = set(np.searchsorted(probs, rs))
+    ixs = np.searchsorted(probs, rs)
+    p_ixs = set(ixs)
 
     all_ixs = set(range(len(critters)))
     other_ixs = all_ixs.difference(p_ixs)
@@ -74,7 +83,7 @@ def mate(critters, fitnessess, top_size, mutation_count):
     return critters
 
 
-@numba.njit(fastmath=True)
+@numba.njit(fastmath=True, parallel=False)
 def life(critters, n, pop_size, fitness_func):
     top_size = max(1, pop_size // 20)
 
@@ -106,13 +115,14 @@ def life(critters, n, pop_size, fitness_func):
             t_threshold = threshold
             t_mutation_p = mutation_p
         else:
-            if delta >= t_threshold:
-                # t_mutation_p = min(0.25, t_mutation_p * 1.2)
+            if delta > t_threshold:
+                t_mutation_p = min(0.1, t_mutation_p * 1.01)
                 t_threshold = min(t_threshold * 1.1, 99999.0)
 
                 critters = cull_mating_pool(critters, fitnessess, top_size)
             else:
                 delta += 1
+                
 
         mutation_count = math.ceil(len(critters) * t_mutation_p)
         critters = mate(critters, fitnessess, top_size, mutation_count)
@@ -120,20 +130,10 @@ def life(critters, n, pop_size, fitness_func):
     return critters
 
 
-@numba.njit(fastmath=True)
-def make_ixs(init_ixs, buckets):
-    ixs = np.full((init_ixs.size, buckets), 0)
-    for i in range(buckets):
-        mask = init_ixs == i
-        ixs[mask, i] = 1
-    return ixs
-
-
-def set_buckets(ixs, df):
+def set_buckets(ixs, df: pd.DataFrame):
     for i in range(ixs.shape[1]):
         mask = ixs[..., i] == 1
         df["bucket"].values[mask] = i
-
     return df
 
 
@@ -141,17 +141,15 @@ buckets = 4
 
 df = pd.read_csv("data/2021Internet-CharterSplit.csv")
 
-df_row = df.iloc[0].to_dict()
-
 init_ixs = df["bucket"].values
 costs = repeat_expand(df["cost"].values)
 discounts = repeat_expand(df["discount"].values)
 
 
-@numba.njit(fastmath=True)
-def calc_cost(critter_ixs: np.ndarray):
+@numba.njit(fastmath=True, parallel=False)
+def calc_cost(ixs):
     total = 0
-    for ix in critter_ixs.T:
+    for ix in ixs.T:
         ix = np.expand_dims(ix, 1)
         z_count = np.count_nonzero(ix)
 
@@ -160,14 +158,17 @@ def calc_cost(critter_ixs: np.ndarray):
             bucket_costs = np.sum(costs * ix)
 
             total += avg_discounts * bucket_costs
-
     return total
 
 
-n = 1000000
+out_filepath = "data/2021-out.csv"
+n = 1 * (10 ** 6)
 pop_size = 500
+fitness_func = calc_cost
+
 critters = np.asarray([make_ixs(init_ixs, buckets) for _ in range(pop_size)])
-critters = life(critters, n, pop_size, calc_cost)
+critters = life(critters, n, pop_size, fitness_func)
+
 
 df = set_buckets(critters[0], df)
-df.to_csv("tmp.csv", index=False)
+df.to_csv(out_filepath, index=False)
