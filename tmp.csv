@@ -7,13 +7,13 @@ psu-id,discount,cost,psu-name,bucket
 60,80,38665,Avery County Schools,0
 70,90,69091,Beaufort County Schools,0
 80,90,38665,Bertie County Schools,0
-90,90,87540,Bladen County Schools,3
-100,90,109805,Brunswick County Schools,3
+90,90,87540,Bladen County Schools,0
+100,90,109805,Brunswick County Schools,0
 110,80,195996,Buncombe County Schools,0
 111,50,38665,Asheville City Schools,0
 120,80,100386,Burke County Public Schools,0
 130,60,203824,Cabarrus County Schools,0
-132,90,100386,Kannapolis City Schools,0
+132,90,100386,Kannapolis City Schools,2
 140,80,100386,Caldwell County Schools,0
 150,60,26790,Camden County School System,0
 160,90,69091,Carteret County Public School System,0
@@ -41,13 +41,13 @@ psu-id,discount,cost,psu-name,bucket
 330,90,69091,Edgecombe County Public Schools,0
 340,80,492064,Winston-Salem Forsyth County Schools,0
 350,80,79144,Franklin County Schools,0
-360,80,203824,Gaston County Schools,3
+360,80,203824,Gaston County Schools,1
 370,70,26790,Gates County Public Schools,0
 380,80,26790,Graham County Schools,0
 390,80,100386,Granville County Schools,0
 400,90,87540,Greene County Schools,0
 410,80,253486,Guilford County Schools,0
-420,90,44815,Halifax County Schools,0
+420,90,44815,Halifax County Schools,2
 421,80,26790,Roanoke Rapids Graded School District,0
 422,90,26790,Weldon City Schools,0
 430,80,169556,Harnett County Schools,0
@@ -68,7 +68,7 @@ psu-id,discount,cost,psu-name,bucket
 570,70,41115,Madison County Public Schools,0
 580,90,26790,Martin County Schools,0
 590,80,68268,McDowell County Schools,0
-600,80,719646,Charlotte-Mecklenburg Schools,0
+600,80,719646,Charlotte-Mecklenburg Schools,3
 610,80,55380,Mitchell County Schools,0
 620,80,44815,Montgomery County Schools,0
 630,70,100386,Moore County Schools,0
@@ -90,8 +90,8 @@ psu-id,discount,cost,psu-name,bucket
 770,90,69091,Richmond County Schools,0
 780,90,203824,Public Schools of Robeson County,0
 790,80,105100,Rockingham County Schools,0
-800,80,195996,Rowan-Salisbury School System,3
-810,90,100386,Rutherford County Schools,0
+800,80,195996,Rowan-Salisbury School System,0
+810,90,100386,Rutherford County Schools,3
 820,90,87540,Sampson County Schools,0
 821,90,44815,Clinton City Schools,0
 830,90,69091,Scotland County Schools,0
@@ -125,7 +125,7 @@ psu-id,discount,cost,psu-name,bucket
 10B,50,29013,South Brunswick Charter School,1
 11A,40,22200,Evergreen Community Charter,1
 11B,40,12864,Artspace Charter School,1
-11C,40,33144,INVEST Collegiate - Imagine,2
+11C,40,33144,INVEST Collegiate - Imagine,1
 11D,50,22200,Franklin School of Innovation,1
 11K,40,12864,Francine Delany New School for Children,1
 12A,40,12864,New Dimensions A Public Charter School,1
@@ -137,20 +137,20 @@ psu-id,discount,cost,psu-name,bucket
 23A,40,22200,Pinnacle Classical Academy,1
 24N,90,18032,Columbus Charter School,1
 26B,60,12696,Alpha Academy,1
-26C,80,11496,Capitol Encore Academy,0
+26C,80,11496,Capitol Encore Academy,1
 298D,80,12864,North Carolina School for the Deaf,0
 298E,90,18520,Eastern North Carolina School for the Deaf,0
-298G,80,11288,Governor Morehead School,2
+298G,80,11288,Governor Morehead School,0
 29A,50,12696,Davidson Charter Academy,1
 32A,90,20222,Maureen Joy Charter School,1
-32B,90,20222,Healthy Start Academy,1
+32B,90,20222,Healthy Start Academy,2
 32C,90,12696,"Carter Community Charter School, Inc.",1
 32D,50,20222,Kestrel Heights School,1
 32K,50,20222,Central Park School for Children,1
 32L,50,29926,Voyager Academy,1
 32M,90,12696,Global Scholars Academy,1
 32N,50,26790,Research Triangle High School,1
-32P,80,12696,Institute for the Development of Young Leaders,2
+32P,80,12696,Institute for the Development of Young Leaders,1
 32Q,40,12696,Reaching All Minds Academy,1
 32R,40,12696,Excelsior Classical Academy CFA,1
 32S,90,12696,KIPP Durham College Preparatory,1
@@ -160,16 +160,16 @@ psu-id,discount,cost,psu-name,bucket
 34D,90,12864,Carter G. Woodson School,1
 34H,40,22200,North Carolina Leadership Academy,1
 36B,40,29926,Piedmont Community Charter School,1
-36C,50,33144,Mountain Island Charter School Inc,2
+36C,50,33144,Mountain Island Charter School Inc,1
 36F,60,10860,Ridgeview Charter School,1
-36G,40,10860,TeamCFA - Community Public Charter,1
+36G,40,10860,TeamCFA - Community Public Charter,2
 39A,50,20222,Falls Lake Academy,1
 39B,50,18032,Oxford Preparatory School,1
 41C,90,10860,Guilford Preparatory Academy,1
 41D,40,12696,Phoenix Academy,1
 41F,80,22200,Triad Math and Science Academy,1
 41G,40,22200,Cornerstone Charter Academy: A Challenge Foundation Academy,1
-41H,80,20222,College Preparatory & Leadership Academy,1
+41H,80,20222,College Preparatory & Leadership Academy,2
 41K,50,20222,Piedmont Classical High School,1
 41M,50,12864,Next Generation Academy,1
 41N,40,10860,Experiential School of Greensboro,1
@@ -180,7 +180,7 @@ psu-id,discount,cost,psu-name,bucket
 45A,40,10860,Mountain Community Sch,1
 45B,40,10860,FernLeaf Community Charter School,1
 49B,40,20222,American Renaissance School,1
-49D,90,10860,Success Institute Charter School,1
+49D,90,10860,Success Institute Charter School,3
 49E,40,55380,"Pine Lake Preparatory, Inc.",1
 50A,50,19820,Summit Charter School,1
 51A,50,18520,Neuse Charter School,1
@@ -192,17 +192,17 @@ psu-id,discount,cost,psu-name,bucket
 60D,50,26790,Lake Norman Charter,1
 60G,50,22200,Queen's Grant Community School,1
 60I,40,22200,Community School of Davidson,1
-60J,40,20222,Socrates Academy,0
+60J,40,20222,Socrates Academy,1
 60K,50,12864,Charlotte Secondary School,1
 60M,40,22200,Corvian Community School,1
 60N,90,10860,Aristotle Preparatory Academy Charter,1
-60P,80,12864,Charlotte Choice Charter,1
+60P,80,12864,Charlotte Choice Charter,0
 60Q,80,22200,Invest Collegiate Transform,1
 60S,40,29926,Bradford Preparatory School,1
 60U,80,12864,Commonwealth High School,1
 60Y,40,10860,Pioneer Springs Community School,1
 61J,40,10860,Lakeside Charter Academy FKA Thunderbird Prep,1
-61K,40,10860,United Community School,1
+61K,40,10860,United Community School,2
 61L,50,10860,Stewart Creek High School,1
 61M,40,22200,Charlotte Lab School,1
 61N,40,22200,Queen City STEM School,1
@@ -223,8 +223,8 @@ psu-id,discount,cost,psu-name,bucket
 65C,90,10860,Douglass Academy,1
 65D,40,10860,Island Montessori Charter School,1
 65F,40,22200,Coastal Preparatory Academy,1
-65G,90,22200,Girls Leadership Academy of Wilmington,3
-66A,80,27046,KIPP Gaston College Preparatory,0
+65G,90,22200,Girls Leadership Academy of Wilmington,1
+66A,80,27046,KIPP Gaston College Preparatory,1
 67B,90,11496,Z.E.C.A. School of Arts and Technology,1
 68A,40,18032,Eno River Academy,1
 69A,90,18032,Arapahoe Charter School,1
@@ -253,7 +253,7 @@ psu-id,discount,cost,psu-name,bucket
 92K,40,22200,Raleigh Charter High School,1
 92L,90,12864,Torchlight Academy,1
 92P,40,27046,Southern Wake Academy,1
-92R,40,12864,Casa Esperanza Montessori Charter School,1
+92R,40,12864,Casa Esperanza Montessori Charter School,3
 92T,40,22200,Triangle Math and Science Academy,1
 92U,40,18520,Longleaf School of the Arts,1
 92Y,40,22200,Envision Science Academy,1
@@ -263,10 +263,10 @@ psu-id,discount,cost,psu-name,bucket
 93N,40,22200,Pine Springs Preparatory Academy,1
 93Q,40,20222,Carolina Charter Academy: CFA,1
 93R,40,12864,Raleigh Oak Charter School,1
-94A,60,9757,Pocosin Innovative Charter,1
-94Z,50,9757,Northeast Regional School of Biotechnology and Agriscience,1
-95A,70,12864,Two Rivers Community School,1
-96C,90,12864,Dillard Academy Charter School,1
+94A,60,9757,Pocosin Innovative Charter,3
+94Z,50,9757,Northeast Regional School of Biotechnology and Agriscience,2
+95A,70,12864,Two Rivers Community School,2
+96C,90,12864,Dillard Academy Charter School,0
 96F,50,22200,Wayne Preparatory Academy,1
-97D,90,9757,Bridges Academy,1
+97D,90,9757,Bridges Academy,0
 98B,40,27046,Wilson Preparatory Academy,1

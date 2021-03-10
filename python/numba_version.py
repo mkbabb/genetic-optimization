@@ -15,60 +15,14 @@ def repeat_expand(x):
     return np.repeat(x.reshape((-1, 1)), 1, axis=1)
 
 
-buckets = 4
-
-df = pd.read_csv("data/2021Internet-CharterSplit.csv")
-
-df_row = df.iloc[0].to_dict()
-
-init_ixs = df["bucket"].values
-costs = repeat_expand(df["cost"].values)
-discounts = repeat_expand(df["discount"].values)
-
-
-# @numba.njit(fastmath=True)
-def make_ixs():
-    ixs = np.full((init_ixs.size, buckets), 0)
-    for i in range(buckets):
-        mask = init_ixs == i
-        ixs[mask, i] = 1
-    return ixs
-
-
-def make_csv(ixs):
-    for i in range(buckets):
-        mask = ixs[..., i] == 1
-        df["bucket"].values[mask] = i
-    return df
-
-
-# @numba.njit(fastmath=True)
-def calc_fitness(critter_ixs: np.ndarray):
-    n = critter_ixs.shape[-1]
-
-    total = 0
-    for i in range(n):
-        ixs = np.expand_dims(critter_ixs.T[i], 1)
-        m = np.count_nonzero(ixs)
-        t_d = discounts * ixs
-
-        if m > 0:
-            d = np.round(np.sum(t_d) / m) / 100.0
-            c = np.sum(costs * ixs)
-            s_i = c * d
-            total += s_i
-
-    return total
-
-
-# @numba.njit(fastmath=True)
-def mutate(critter, mutation_amount: float):
-    for _ in range(mutation_amount):
+@numba.njit(fastmath=True)
+def mutate(critter, mutation_p: float):
+    for _ in range(mutation_p):
         r = random.randint(0, init_ixs.size - 1)
         np.random.shuffle(critter[r])
 
 
-# @numba.njit(fastmath=True)
+@numba.njit(fastmath=True)
 def k_point_crossover(critter, k, parents):
     delta = len(costs) // (k * len(parents))
     start, end = 0, delta
@@ -80,38 +34,56 @@ def k_point_crossover(critter, k, parents):
             end += delta
 
 
-# @numba.njit(fastmath=True)
+@numba.njit(fastmath=True)
 def select_parents(critters, top_size):
-    parent_count = 4
+    parent_count = 2
     return [critters[random.randint(0, top_size - 1)] for _ in range(parent_count)]
 
 
-# @numba.njit(fastmath=True)
-def mate(critters, top_size, mutation_amount):
+@numba.njit(fastmath=True)
+def cull_mating_pool(critters, fitnessess, mating_pool_size):
+    total_fitness = fitnessess.sum()
+
+    probs = np.cumsum(fitnessess / total_fitness)
+
+    rs = np.random.random(mating_pool_size)
+    p_ixs = set(np.searchsorted(probs, rs))
+
+    all_ixs = set(range(len(critters)))
+    other_ixs = all_ixs.difference(p_ixs)
+
+    ixs = np.array(list(p_ixs) + list(other_ixs))
+
+    return critters[ixs]
+
+
+@numba.njit(fastmath=True)
+def mate(critters, fitnessess, top_size, mutation_count):
+    # critters = cull_mating_pool(critters, fitnessess, top_size)
+
     k = 4
-    for i in range(len(critters)):
-        critter = critters[i]
-        if i > top_size:
-            k_point_crossover(critter, k, select_parents(critters, top_size))
-            mutate(critter, mutation_amount)
+    for n, critter in enumerate(critters):
+        if n > top_size:
+            parents = select_parents(critters, top_size)
+            k_point_crossover(critter, k, parents)
+            mutate(critter, mutation_count)
+        # else:
+        #     t_mutation_count = mutation_count // 4
+        #     mutate(critter, t_mutation_count)
+
+    return critters
 
 
-def exp_backoff(threshold, c):
-    m = 2 ** (c - 1)
-    r = random.randint(0, m) / m
-    return r * threshold
+@numba.njit(fastmath=True)
+def life(critters, n, pop_size, fitness_func):
+    top_size = max(1, pop_size // 20)
 
+    mutation_p = 0.01
+    t_mutation_p = mutation_p
 
-# @numba.njit(fastmath=True)
-def life(critters, n, pop_size):
-    top_size = max(1, pop_size // 10)
+    delta = 0
 
-    mutation_amount = 1
-    t_mutation_amount = mutation_amount
-
-    delta = 0.0
-
-    threshold = 100.0
+    threshold = 50
     t_threshold = threshold
 
     prev = 0
@@ -119,7 +91,8 @@ def life(critters, n, pop_size):
 
     for i in range(n):
         for j, critter in enumerate(critters):
-            fitnessess[j] = calc_fitness(critter)
+            fitnessess[j] = fitness_func(critter)
+
         ixs = np.argsort(-fitnessess)
         fitnessess = fitnessess[ixs]
         critters = critters[ixs]
@@ -127,29 +100,74 @@ def life(critters, n, pop_size):
 
         if total > prev:
             print(i, total)
-            df.to_csv("tmp.csv", index=False)
-
             prev = total
+
             delta = 0
             t_threshold = threshold
-            t_mutation_amount = mutation_amount
+            t_mutation_p = mutation_p
         else:
-            if delta > t_threshold:
-                delta = 0
-                t_mutation_amount = min(
-                    (len(costs) - 1) // 4, math.ceil(t_mutation_amount * 1.1)
-                )
+            if delta >= t_threshold:
+                # t_mutation_p = min(0.25, t_mutation_p * 1.2)
                 t_threshold = min(t_threshold * 1.1, 99999.0)
+
+                critters = cull_mating_pool(critters, fitnessess, top_size)
             else:
                 delta += 1
 
-        mate(critters, top_size, t_mutation_amount)
+        mutation_count = math.ceil(len(critters) * t_mutation_p)
+        critters = mate(critters, fitnessess, top_size, mutation_count)
 
     return critters
 
 
-n = 100
-pop_size = 10
-print(df)
-critters = np.asarray([make_ixs() for _ in range(pop_size)])
-critters = life(critters, n, pop_size)
+@numba.njit(fastmath=True)
+def make_ixs(init_ixs, buckets):
+    ixs = np.full((init_ixs.size, buckets), 0)
+    for i in range(buckets):
+        mask = init_ixs == i
+        ixs[mask, i] = 1
+    return ixs
+
+
+def set_buckets(ixs, df):
+    for i in range(ixs.shape[1]):
+        mask = ixs[..., i] == 1
+        df["bucket"].values[mask] = i
+
+    return df
+
+
+buckets = 4
+
+df = pd.read_csv("data/2021Internet-CharterSplit.csv")
+
+df_row = df.iloc[0].to_dict()
+
+init_ixs = df["bucket"].values
+costs = repeat_expand(df["cost"].values)
+discounts = repeat_expand(df["discount"].values)
+
+
+@numba.njit(fastmath=True)
+def calc_cost(critter_ixs: np.ndarray):
+    total = 0
+    for ix in critter_ixs.T:
+        ix = np.expand_dims(ix, 1)
+        z_count = np.count_nonzero(ix)
+
+        if z_count > 0:
+            avg_discounts = np.round(np.sum(discounts * ix) / z_count) / 100.0
+            bucket_costs = np.sum(costs * ix)
+
+            total += avg_discounts * bucket_costs
+
+    return total
+
+
+n = 1000000
+pop_size = 500
+critters = np.asarray([make_ixs(init_ixs, buckets) for _ in range(pop_size)])
+critters = life(critters, n, pop_size, calc_cost)
+
+df = set_buckets(critters[0], df)
+df.to_csv("tmp.csv", index=False)
