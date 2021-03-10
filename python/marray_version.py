@@ -22,7 +22,10 @@ def make_ixs():
     ixs = np.full((init_buckets.size, buckets, 1), np.nan)
     for i in range(buckets):
         mask = init_buckets == i
-        ixs[mask, i,] = 1
+        ixs[
+            mask,
+            i,
+        ] = 1
     return ixs
 
 
@@ -110,4 +113,3 @@ def life(n, pop_size):
 
 
 life(100000, 10000)
-
