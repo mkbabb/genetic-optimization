@@ -246,7 +246,7 @@ def calc_cost(ixs: np.ndarray) -> float:
     return total
 
 
-n = 1 * (10 ** 2)
+n = 1 * (10 ** 7)
 pop_size = 200
 fitness_func = calc_cost
 
