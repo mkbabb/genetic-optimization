@@ -209,7 +209,7 @@ def set_buckets(ixs: np.ndarray, df: pd.DataFrame):
 
 use_last = True
 
-t = int(datetime.timestamp())
+t = int(datetime.now().timestamp())
 now = datetime.now().isoformat()
 
 random.seed(t)
@@ -232,7 +232,7 @@ discounts = repeat_expand(df["discount"].values)
 
 
 @numba.njit(fastmath=True, parallel=False)
-def calc_cost(ixs):
+def calc_cost(ixs: np.ndarray) -> float:
     total = 0
     for ix in ixs.T:
         ix = np.expand_dims(ix, 1)
@@ -246,7 +246,7 @@ def calc_cost(ixs):
     return total
 
 
-n = 1 * (10 ** 7)
+n = 1 * (10 ** 2)
 pop_size = 200
 fitness_func = calc_cost
 
