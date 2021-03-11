@@ -26,33 +26,45 @@ def make_ixs(init_ixs, buckets):
 @numba.njit(fastmath=True, parallel=False)
 def mutate(critter, mutation_p: float):
     for _ in range(mutation_p):
-        r = random.randint(0, init_ixs.size)
+        r = random.randint(0, critters.shape[1] - 1)
         np.random.shuffle(critter[r])
 
 
 @numba.njit(fastmath=True, parallel=False)
-def k_point_crossover(critter, k, parent_ixs):
+def k_point_crossover_random(critter, k, parent_ixs):
+    points = np.sort(np.random.randint(0, critters.shape[1] - 1, k + 2))
+
+    points[0] = 0
+    points[-1] = critters.shape[1]
+
+    for i in range(1, k + 2):
+        start, end = points[i - 1], points[i]
+
+        parent = critters[parent_ixs[0]]
+        parent_ixs = np.roll(parent_ixs, 1)
+
+        critter[start:end] = parent[start:end]
+
+
+@numba.njit(fastmath=True, parallel=False)
+def k_point_crossover_uniform(critter, k, parent_ixs):
     delta = len(costs) // (k * len(parent_ixs))
     start, end = 0, delta
 
-    points = np.sort(np.random.randint(0, critters.shape[0], k + 2))
-    
-    points[0] = 0
-    points[-1] = critters.shape[0]
-
-    for i in range(1, k):
-        start, end = points[i - 1], points[i]
+    for _ in range(k):
         for ix in parent_ixs:
-            critter[start: end] = critters[ix][start:end]
+            critter[start:end] = critters[ix][start:end]
+            start = end
+            end += delta
+
 
 @numba.njit(fastmath=True)
 def select_parents(critters, top_size):
     parent_count = min(top_size, 4)
 
-    p_ixs = set([random.randrange(0, top_size) for _ in range(parent_count)])
-    # other_ixs = set([random.randrange(0, len(critters)) for _ in range(parent_count//2)])
+    p_ixs = np.random.randint(0, top_size - 1, parent_count)
 
-    return np.array(list(p_ixs))
+    return np.unique(p_ixs)
 
 
 @numba.njit(fastmath=True)
@@ -65,29 +77,35 @@ def mate(critters, top_size, mutation_p):
     mutation_count = get_mutation_count(critters, mutation_p)
     t_mutation_count = get_mutation_count(critters, mutation_p / 2)
 
-    k = 2
+    k = 4
     for n, critter in enumerate(critters):
         if n > top_size:
             parent_ixs = select_parents(critters, top_size)
-            k_point_crossover(critter, k, parent_ixs)
+            k_point_crossover_uniform(critter, k, parent_ixs)
             mutate(critter, mutation_count)
-        else:
-            mutate(critter, t_mutation_count)
+        # elif n != 0:
+        #     mutate(critter, t_mutation_count)
 
     return critters
 
 
 @numba.njit(fastmath=True, parallel=False)
 def promulgate_critter(max_critter, critters):
-    critters.fill(max_critter)
+    critters[:] = max_critter
     return critters
 
 
 @numba.njit(fastmath=True, parallel=False)
-def cull_mating_pool(critters, fitnessess, mating_pool_size):
-    total_fitness = fitnessess.sum()
+def norm_fitnessess(fitnessess):
+    return fitnessess ** 3
 
-    probs = np.cumsum(fitnessess / total_fitness)
+
+@numba.njit(fastmath=True, parallel=False)
+def cull_mating_pool(critters, fitnessess, mating_pool_size):
+    normed_fitnessess = norm_fitnessess(fitnessess / fitnessess[0])
+    total_fitness = normed_fitnessess.sum()
+
+    probs = np.cumsum(normed_fitnessess / total_fitness)
 
     rs = np.random.random(mating_pool_size)
     ixs = np.searchsorted(probs, rs)
@@ -96,16 +114,15 @@ def cull_mating_pool(critters, fitnessess, mating_pool_size):
     all_ixs = set(range(len(critters)))
     other_ixs = all_ixs.difference(p_ixs)
 
-    ixs = np.array(list(p_ixs) + list(other_ixs))
-
+    ixs = np.array(list(sorted(p_ixs)) + list(other_ixs))
     return critters[ixs]
 
 
 @numba.njit(fastmath=True, parallel=False)
-def life(critters, n, pop_size, fitness_func):
+def life(critters: List[np.ndarray], n, pop_size, fitness_func):
     top_size = max(1, pop_size // 10)
 
-    mutation_p = 0.01
+    mutation_p = 0.02
     a, b = mutation_p, 0.1
     t_mutation_p = mutation_p
 
@@ -114,7 +131,7 @@ def life(critters, n, pop_size, fitness_func):
     threshold = 100
     t_threshold = threshold
 
-    max_threshold = n // 8
+    max_threshold = n // 4
 
     max_fitness = 0
     fitnessess = np.zeros(pop_size)
@@ -136,7 +153,7 @@ def life(critters, n, pop_size, fitness_func):
             print(i, "final:", max_fitness)
             break
         elif t_max_fitness > max_fitness:
-            max_critter = critters[0]
+            max_critter = critters[0].copy()
 
             print(i, t_max_fitness, "max delta:", t_max_fitness - max_fitness)
             max_fitness = t_max_fitness
@@ -145,11 +162,13 @@ def life(critters, n, pop_size, fitness_func):
             t_threshold = threshold
             t_mutation_p = mutation_p
         else:
+            critters = mate(critters, top_size, t_mutation_p)
+
             if delta > t_threshold:
                 print(" skipping, delta is:", delta, t_threshold, t_mutation_p)
 
-                t_mutation_p = min(random.random() * (b - a) + a, t_mutation_p * 1.1)
-                t_threshold = min(t_threshold * 1.5, max_threshold)
+                t_mutation_p = min(random.random() * (b - a) + a, t_mutation_p * 1.05)
+                t_threshold = min(t_threshold * 2, max_threshold)
 
                 if delta >= max_threshold:
                     print(" ***promulgating critter")
@@ -162,8 +181,6 @@ def life(critters, n, pop_size, fitness_func):
                 delta = 0
             else:
                 delta += 1
-
-        critters = mate(critters, top_size, t_mutation_p)
 
         i += 1
 
