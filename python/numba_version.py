@@ -69,7 +69,7 @@ def cull_mating_pool(critters, fitnessess, mating_pool_size):
 @numba.njit(fastmath=True)
 def mate(critters, fitnessess, top_size, mutation_count):
 
-    k = 2
+    k = 4
     for n, critter in enumerate(critters):
         if n > top_size:
             parents = select_parents(critters, top_size)
@@ -126,19 +126,20 @@ def life(critters, n, pop_size, fitness_func):
         else:
             if delta > t_threshold:
                 print("\tskipping, delta is:", delta, t_threshold, t_mutation_p)
-                t_mutation_p = min(random.random() * (b - a) + a, t_mutation_p * 1.01)
+                t_mutation_p = min(random.random() * (b - a) + a, t_mutation_p * 1.1)
                 t_threshold = min(t_threshold * 1.5, 99999.0)
 
                 critters = cull_mating_pool(critters, fitnessess, top_size)
-                critters[0] = max_critter
-
+                
                 delta = 0
             else:
                 delta += 1
 
         mutation_count = math.ceil(len(critters) * t_mutation_p)
         critters = mate(critters, fitnessess, top_size, mutation_count)
-
+        
+        critters[0] = max_critter
+        
         i += 1
 
     return max_critter
@@ -187,7 +188,7 @@ def calc_cost(ixs):
     return total
 
 
-n = 1 * (10 ** 7)
+n = 1 * (10 ** 6)
 pop_size = 100
 fitness_func = calc_cost
 
