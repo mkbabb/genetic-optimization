@@ -1,13 +1,11 @@
 import math
-import os
 import random
+import time
 from typing import *
 
 import numba
 import numpy as np
 import pandas as pd
-
-import time
 
 
 def repeat_expand(x):
@@ -60,7 +58,7 @@ def k_point_crossover_uniform(critter, k, parent_ixs):
 
 @numba.njit(fastmath=True)
 def select_parents(critters, top_size):
-    parent_count = min(top_size, 4)
+    parent_count = min(top_size, 6)
 
     p_ixs = np.random.randint(0, top_size - 1, parent_count)
 
@@ -97,7 +95,7 @@ def promulgate_critter(max_critter, critters):
 
 @numba.njit(fastmath=True, parallel=False)
 def norm_fitnessess(fitnessess):
-    return fitnessess ** 3
+    return fitnessess ** 2
 
 
 @numba.njit(fastmath=True, parallel=False)
@@ -120,10 +118,10 @@ def cull_mating_pool(critters, fitnessess, mating_pool_size):
 
 @numba.njit(fastmath=True, parallel=False)
 def life(critters: List[np.ndarray], n, pop_size, fitness_func):
-    top_size = max(1, pop_size // 10)
+    top_size = max(1, pop_size // 5)
 
-    mutation_p = 0.02
-    a, b = mutation_p, 0.1
+    mutation_p = 0.01
+    a, b = mutation_p, 0.2
     t_mutation_p = mutation_p
 
     delta = 0
@@ -165,7 +163,7 @@ def life(critters: List[np.ndarray], n, pop_size, fitness_func):
             critters = mate(critters, top_size, t_mutation_p)
 
             if delta > t_threshold:
-                print(" skipping, delta is:", delta, t_threshold, t_mutation_p)
+                print(i, " skipping, delta is:", delta, t_threshold, t_mutation_p)
 
                 t_mutation_p = min(random.random() * (b - a) + a, t_mutation_p * 1.05)
                 t_threshold = min(t_threshold * 2, max_threshold)
@@ -181,6 +179,8 @@ def life(critters: List[np.ndarray], n, pop_size, fitness_func):
                 delta = 0
             else:
                 delta += 1
+            
+            critters[-1] = max_critter
 
         i += 1
 
@@ -230,8 +230,8 @@ def calc_cost(ixs):
     return total
 
 
-n = 1 * (10 ** 5)
-pop_size = 100
+n = 1 * (10 ** 7)
+pop_size = 200
 fitness_func = calc_cost
 
 critters = np.asarray([make_ixs(init_ixs, buckets) for _ in range(pop_size)])
