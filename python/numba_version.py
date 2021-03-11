@@ -1,4 +1,5 @@
 import math
+import os
 import random
 from typing import *
 
@@ -6,8 +7,7 @@ import numba
 import numpy as np
 import pandas as pd
 
-random.seed(1)
-np.random.seed(1)
+import time
 
 
 def repeat_expand(x):
@@ -44,7 +44,7 @@ def k_point_crossover(critter, k, parents):
 
 @numba.njit(fastmath=True)
 def select_parents(critters, top_size):
-    parent_count = 2
+    parent_count = min(top_size, 4)
     return [critters[random.randint(0, top_size - 1)] for _ in range(parent_count)]
 
 
@@ -68,17 +68,16 @@ def cull_mating_pool(critters, fitnessess, mating_pool_size):
 
 @numba.njit(fastmath=True)
 def mate(critters, fitnessess, top_size, mutation_count):
-    # critters = cull_mating_pool(critters, fitnessess, top_size)
 
-    k = 4
+    k = 2
     for n, critter in enumerate(critters):
         if n > top_size:
             parents = select_parents(critters, top_size)
             k_point_crossover(critter, k, parents)
             mutate(critter, mutation_count)
-        # else:
-        #     t_mutation_count = mutation_count // 4
-        #     mutate(critter, t_mutation_count)
+        else:
+            t_mutation_count = mutation_count // 4
+            mutate(critter, t_mutation_count)
 
     return critters
 
@@ -88,11 +87,12 @@ def life(critters, n, pop_size, fitness_func):
     top_size = max(1, pop_size // 20)
 
     mutation_p = 0.01
+    a, b = mutation_p, 0.1
     t_mutation_p = mutation_p
 
     delta = 0
 
-    threshold = 50
+    threshold = 100
     t_threshold = threshold
 
     prev = 0
@@ -116,13 +116,12 @@ def life(critters, n, pop_size, fitness_func):
             t_mutation_p = mutation_p
         else:
             if delta > t_threshold:
-                t_mutation_p = min(0.1, t_mutation_p * 1.01)
+                t_mutation_p = min(random.random() * (b - a) + a, t_mutation_p * 1.01)
                 t_threshold = min(t_threshold * 1.1, 99999.0)
 
                 critters = cull_mating_pool(critters, fitnessess, top_size)
             else:
                 delta += 1
-                
 
         mutation_count = math.ceil(len(critters) * t_mutation_p)
         critters = mate(critters, fitnessess, top_size, mutation_count)
@@ -137,9 +136,21 @@ def set_buckets(ixs, df: pd.DataFrame):
     return df
 
 
+use_last = True
+
+t = int(time.time())
+random.seed(t)
+np.random.seed(t)
+
 buckets = 4
 
-df = pd.read_csv("data/2021Internet-CharterSplit.csv")
+tmp_filepath = "data/2021-optimization/tmp.csv"
+
+in_filepath = "data/2021-optimization/in.csv" if not use_last else tmp_filepath
+out_filepath = f"data/2021-optimization/out-{t}.csv"
+
+
+df = pd.read_csv(in_filepath)
 
 init_ixs = df["bucket"].values
 costs = repeat_expand(df["cost"].values)
@@ -161,7 +172,6 @@ def calc_cost(ixs):
     return total
 
 
-out_filepath = "data/2021-out.csv"
 n = 1 * (10 ** 6)
 pop_size = 500
 fitness_func = calc_cost
@@ -169,6 +179,6 @@ fitness_func = calc_cost
 critters = np.asarray([make_ixs(init_ixs, buckets) for _ in range(pop_size)])
 critters = life(critters, n, pop_size, fitness_func)
 
-
 df = set_buckets(critters[0], df)
 df.to_csv(out_filepath, index=False)
+df.to_csv(tmp_filepath, index=False)
