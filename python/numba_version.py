@@ -265,8 +265,8 @@ def calc_cost(ixs: np.ndarray) -> float:
     return total, discount_costs
 
 
-n = 1 * (10 ** 5)
-pop_size = 50
+n = 1 * (10 ** 7)
+pop_size = 100
 fitness_func = calc_cost
 
 critters = np.asarray([make_ixs(init_buckets, buckets) for _ in range(pop_size)])
