@@ -84,7 +84,7 @@ def mate(critters, fitnessess, top_size, mutation_count):
 
 @numba.njit(fastmath=True, parallel=False)
 def life(critters, n, pop_size, fitness_func):
-    top_size = max(1, pop_size // 20)
+    top_size = max(1, pop_size // 10)
 
     mutation_p = 0.01
     a, b = mutation_p, 0.1
@@ -95,38 +95,53 @@ def life(critters, n, pop_size, fitness_func):
     threshold = 100
     t_threshold = threshold
 
-    prev = 0
+    max_fitness = 0
     fitnessess = np.zeros(pop_size)
 
-    for i in range(n):
+    max_critter = None
+
+    i = 0
+    while True:
         for j, critter in enumerate(critters):
             fitnessess[j] = fitness_func(critter)
 
         ixs = np.argsort(-fitnessess)
         fitnessess = fitnessess[ixs]
         critters = critters[ixs]
-        total = fitnessess[0]
 
-        if total > prev:
-            print(i, total)
-            prev = total
+        t_max_fitness = fitnessess[0]
+
+        if i > n:
+            print("final:", max_fitness)
+            break
+        elif t_max_fitness > max_fitness:
+            max_critter = critters[0]
+           
+            print(i, t_max_fitness, t_max_fitness - max_fitness)
+            max_fitness = t_max_fitness
 
             delta = 0
             t_threshold = threshold
             t_mutation_p = mutation_p
         else:
             if delta > t_threshold:
+                print("\tskipping, delta is:", delta, t_threshold, t_mutation_p)
                 t_mutation_p = min(random.random() * (b - a) + a, t_mutation_p * 1.01)
-                t_threshold = min(t_threshold * 1.1, 99999.0)
+                t_threshold = min(t_threshold * 1.5, 99999.0)
 
                 critters = cull_mating_pool(critters, fitnessess, top_size)
+                critters[0] = max_critter
+
+                delta = 0
             else:
                 delta += 1
 
         mutation_count = math.ceil(len(critters) * t_mutation_p)
         critters = mate(critters, fitnessess, top_size, mutation_count)
 
-    return critters
+        i += 1
+
+    return max_critter
 
 
 def set_buckets(ixs, df: pd.DataFrame):
@@ -172,13 +187,13 @@ def calc_cost(ixs):
     return total
 
 
-n = 1 * (10 ** 6)
-pop_size = 500
+n = 1 * (10 ** 7)
+pop_size = 100
 fitness_func = calc_cost
 
 critters = np.asarray([make_ixs(init_ixs, buckets) for _ in range(pop_size)])
-critters = life(critters, n, pop_size, fitness_func)
+max_critter = life(critters, n, pop_size, fitness_func)
 
-df = set_buckets(critters[0], df)
+df = set_buckets(max_critter, df)
 df.to_csv(out_filepath, index=False)
 df.to_csv(tmp_filepath, index=False)
