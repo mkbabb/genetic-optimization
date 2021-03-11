@@ -24,15 +24,17 @@ def make_ixs(init_buckets: np.ndarray, buckets: int):
 
 @numba.njit(fastmath=True, parallel=False)
 def mutate(critter: np.ndarray, mutation_count: int) -> np.ndarray:
-    cost, discount_costs = calc_cost(critter)
-    discount_costs /= cost
+    # cost, discount_costs = calc_cost(critter)
+    # discount_costs /= cost
+    # discount_costs = 1 - discount_costs
 
     for _ in range(mutation_count):
         r = random.randint(0, critter.shape[0] - 1)
-        critter[r] = 0
+        np.random.shuffle(critter[r])
+        # critter[r] = 0
 
-        i = choice(p=discount_costs)
-        critter[r][i] = 1
+        # i = choice(p=discount_costs)
+        # critter[r][i] = 1
 
     return critter
 
@@ -107,7 +109,7 @@ def promulgate_critter(max_critter: np.ndarray, critters: np.ndarray) -> np.ndar
 
 @numba.njit(fastmath=True, parallel=False)
 def norm_fitnessess(fitnessess: np.ndarray) -> np.ndarray:
-    return fitnessess ** 2
+    return fitnessess
 
 
 @numba.njit(fastmath=True, parallel=False)
@@ -148,13 +150,15 @@ def life(
 ) -> np.ndarray:
     top_size = max(1, pop_size // 10)
 
-    mutation_p = 0.02
-    a, b = mutation_p, 0.08
+    mutation_p = 0.01
+    a, b = mutation_p, 0.02
+    t_b = a
+
     t_mutation_p = mutation_p
 
     delta = 0
 
-    threshold = 100
+    threshold = 200
     t_threshold = threshold
 
     max_threshold = n // 8
@@ -180,7 +184,6 @@ def life(
             break
         elif t_max_fitness > max_fitness:
             max_critter = critters[0].copy()
-            print(fitnessess[:top_size])
             print(i, t_max_fitness, "max delta:", t_max_fitness - max_fitness)
             max_fitness = t_max_fitness
 
@@ -189,14 +192,14 @@ def life(
             t_mutation_p = mutation_p
         else:
             if delta > t_threshold:
-                print(fitnessess[:top_size])
-                print(i, " skipping, delta is:", delta, t_threshold, t_mutation_p)
+                print("\t", i, " skipping, delta is:", delta, t_threshold, t_mutation_p)
 
-                t_mutation_p = min(random.random() * (b - a) + a, t_mutation_p * 1.01)
-                t_threshold = min(t_threshold * 2, max_threshold)
+                t_mutation_p = random.random() * (t_b - a) + a
+                t_threshold = min(t_threshold * 1.5, max_threshold)
+                t_b = min(t_b * 1.25, b)
 
                 if delta >= max_threshold:
-                    print(" ***promulgating critter")
+                    print("\t***promulgating critter")
                     critters = promulgate_critter(max_critter, critters)
 
                     t_threshold = threshold
@@ -221,7 +224,7 @@ def set_buckets(ixs: np.ndarray, df: pd.DataFrame):
     return df
 
 
-use_last = True
+use_last = False
 
 t = int(datetime.now().timestamp())
 now = datetime.now().isoformat()
@@ -255,7 +258,7 @@ def calc_cost(ixs: np.ndarray) -> float:
         z_count = np.count_nonzero(ix)
 
         if z_count > 0:
-            avg_discounts = np.round(np.sum(discounts * ix) / z_count) / 100.0
+            avg_discounts = np.round(np.sum(discounts * ix) / z_count / 100.0, 2)
             bucket_costs = np.sum(costs * ix)
             discount_cost = avg_discounts * bucket_costs
 

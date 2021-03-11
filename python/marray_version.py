@@ -9,7 +9,7 @@ np.random.seed(1)
 
 buckets = 4
 
-df = pd.read_csv("data/2021Internet-CharterSplit.csv")
+df = pd.read_csv("data/2021-optimization/tmp.csv")
 
 repeat_expand = lambda x: np.repeat(x.reshape((-1, 1, 1)), 1, axis=1)
 
@@ -57,7 +57,7 @@ def k_point_crossover(critter, k, parent_ixs, critters):
 
 def select_parent_ixs(critters, top_size):
     parent_count = 4
-    return [random.randint(0, critters.shape[0] - 1) for _ in range(parent_count)]
+    return [random.randrange(top_size) for _ in range(parent_count)]
 
 
 def mate(critters, top_size, mutation_amount):
@@ -67,11 +67,11 @@ def mate(critters, top_size, mutation_amount):
         if i > top_size:
             parent_ixs = select_parent_ixs(critters, top_size)
             k_point_crossover(critter, k, parent_ixs, critters)
-        mutate(critter, mutation_amount)
+            mutate(critter, mutation_amount)
 
 
 def life(n, pop_size):
-    top_size = max(1, pop_size // 100)
+    top_size = max(1, pop_size // 10)
 
     mutation_amount = 1
     t_mutation_amount = mutation_amount
@@ -102,6 +102,7 @@ def life(n, pop_size):
             t_mutation_amount = mutation_amount
         else:
             if delta > t_threshold:
+                print(i, delta)
                 delta = 0
                 t_mutation_amount = min(
                     (len(costs) - 1) // 4, math.ceil(t_mutation_amount * 1.1)
@@ -112,4 +113,4 @@ def life(n, pop_size):
         mate(critters, top_size, t_mutation_amount)
 
 
-life(100000, 10000)
+life(100000, 100)
