@@ -44,26 +44,25 @@ def k_point_crossover(critter, k, parent_ixs):
 
 @numba.njit(fastmath=True)
 def select_parents(critters, top_size):
-    parent_count = min(top_size, 6)
-    
+    parent_count = min(top_size, 4)
+
     p_ixs = set([random.randrange(0, top_size) for _ in range(parent_count)])
     # other_ixs = set([random.randrange(0, len(critters)) for _ in range(parent_count//2)])
 
     return np.array(list(p_ixs))
 
 
-
 @numba.njit(fastmath=True)
 def get_mutation_count(critters, mutation_p):
-    return math.ceil(len(critters) * mutation_p)
+    return max(1, math.ceil(len(critters) * mutation_p))
 
 
 @numba.njit(fastmath=True)
-def mate(critters, fitnessess, top_size, mutation_p):
+def mate(critters, top_size, mutation_p):
     mutation_count = get_mutation_count(critters, mutation_p)
-    t_mutation_count = get_mutation_count(critters, mutation_p/4)
+    t_mutation_count = get_mutation_count(critters, mutation_p / 2)
 
-    k = 1
+    k = 2
     for n, critter in enumerate(critters):
         if n > top_size:
             parent_ixs = select_parents(critters, top_size)
@@ -130,12 +129,12 @@ def life(critters, n, pop_size, fitness_func):
 
         t_max_fitness = fitnessess[0]
 
-        if i > n:
-            print("final:", max_fitness)
+        if i >= n:
+            print(i, "final:", max_fitness)
             break
         elif t_max_fitness > max_fitness:
             max_critter = critters[0]
-           
+
             print(i, t_max_fitness, "max delta:", t_max_fitness - max_fitness)
             max_fitness = t_max_fitness
 
@@ -145,21 +144,24 @@ def life(critters, n, pop_size, fitness_func):
         else:
             if delta > t_threshold:
                 print(" skipping, delta is:", delta, t_threshold, t_mutation_p)
-                
+
                 t_mutation_p = min(random.random() * (b - a) + a, t_mutation_p * 1.1)
                 t_threshold = min(t_threshold * 1.5, max_threshold)
 
-                if (delta >= max_threshold):
+                if delta >= max_threshold:
                     print(" ***promulgating critter")
                     critters = promulgate_critter(max_critter, critters)
+
+                    t_threshold = threshold
+                    t_mutation_p = mutation_p
                 else:
                     critters = cull_mating_pool(critters, fitnessess, top_size)
                 delta = 0
             else:
                 delta += 1
 
-        critters = mate(critters, fitnessess, top_size, t_mutation_p)
-        
+        critters = mate(critters, top_size, t_mutation_p)
+
         i += 1
 
     return max_critter
@@ -209,7 +211,7 @@ def calc_cost(ixs):
 
 
 n = 1 * (10 ** 5)
-pop_size = 100
+pop_size = 500
 fitness_func = calc_cost
 
 critters = np.asarray([make_ixs(init_ixs, buckets) for _ in range(pop_size)])
