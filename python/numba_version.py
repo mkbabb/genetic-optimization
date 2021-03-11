@@ -74,7 +74,7 @@ def k_point_crossover_uniform(
 
 @numba.njit(fastmath=True)
 def select_parents(critters: np.ndarray, top_size: int) -> np.ndarray:
-    parent_count = min(top_size, 2)
+    parent_count = min(top_size, 4)
     p_ixs = np.random.randint(0, top_size - 1, parent_count)
     return np.unique(p_ixs)
 
@@ -109,7 +109,7 @@ def promulgate_critter(max_critter: np.ndarray, critters: np.ndarray) -> np.ndar
 
 @numba.njit(fastmath=True, parallel=False)
 def norm_fitnessess(fitnessess: np.ndarray) -> np.ndarray:
-    return fitnessess
+    return fitnessess ** 100
 
 
 @numba.njit(fastmath=True, parallel=False)
@@ -118,7 +118,7 @@ def choice(p: np.ndarray, values: np.ndarray = None, size=1):
     probs /= probs[-1]
 
     rs = np.random.random(size)
-    ixs = np.searchsorted(probs, rs)
+    ixs = np.searchsorted(probs, rs, side="left")
 
     if values is not None:
         return values[ixs]
@@ -151,7 +151,7 @@ def life(
     top_size = max(1, pop_size // 10)
 
     mutation_p = 0.01
-    a, b = mutation_p, 0.02
+    a, b = mutation_p, 0.03
     t_b = a
 
     t_mutation_p = mutation_p
@@ -196,7 +196,7 @@ def life(
 
                 t_mutation_p = random.random() * (t_b - a) + a
                 t_threshold = min(t_threshold * 1.5, max_threshold)
-                t_b = min(t_b * 1.25, b)
+                t_b = min(t_b * 1.1, b)
 
                 if delta >= max_threshold:
                     print("\t***promulgating critter")
@@ -204,12 +204,11 @@ def life(
 
                     t_threshold = threshold
                     t_mutation_p = mutation_p
-                else:
-                    critters = cull_mating_pool(critters, fitnessess, top_size)
                 delta = 0
             else:
                 delta += 1
 
+            critters = cull_mating_pool(critters, fitnessess, top_size)
             critters = mate(critters, top_size, t_mutation_p)
 
         i += 1
@@ -268,7 +267,7 @@ def calc_cost(ixs: np.ndarray) -> float:
     return total, discount_costs
 
 
-n = 1 * (10 ** 7)
+n = 1 * (10 ** 6)
 pop_size = 100
 fitness_func = calc_cost
 
