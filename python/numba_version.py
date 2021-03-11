@@ -1,35 +1,39 @@
 import math
 import random
-import time
 from typing import *
+from datetime import datetime
 
 import numba
 import numpy as np
 import pandas as pd
+import pathlib
 
 
-def repeat_expand(x):
+def repeat_expand(x: np.ndarray) -> np.ndarray:
     return np.repeat(x.reshape((-1, 1)), 1, axis=1)
 
 
 @numba.njit(fastmath=True)
-def make_ixs(init_ixs, buckets):
-    ixs = np.full((init_ixs.size, buckets), 0)
+def make_ixs(init_buckets: np.ndarray, buckets: int):
+    ixs = np.full((init_buckets.size, buckets), 0)
     for i in range(buckets):
-        mask = init_ixs == i
+        mask = init_buckets == i
         ixs[mask, i] = 1
     return ixs
 
 
 @numba.njit(fastmath=True, parallel=False)
-def mutate(critter, mutation_p: float):
+def mutate(critter: np.ndarray, mutation_p: float) -> np.ndarray:
     for _ in range(mutation_p):
         r = random.randint(0, critters.shape[1] - 1)
         np.random.shuffle(critter[r])
+    return critter
 
 
 @numba.njit(fastmath=True, parallel=False)
-def k_point_crossover_random(critter, k, parent_ixs):
+def k_point_crossover_random(
+    critter: np.ndarray, k: int, parent_ixs: np.ndarray
+) -> np.ndarray:
     points = np.sort(np.random.randint(0, critters.shape[1] - 1, k + 2))
 
     points[0] = 0
@@ -42,10 +46,13 @@ def k_point_crossover_random(critter, k, parent_ixs):
         parent_ixs = np.roll(parent_ixs, 1)
 
         critter[start:end] = parent[start:end]
+    return critter
 
 
 @numba.njit(fastmath=True, parallel=False)
-def k_point_crossover_uniform(critter, k, parent_ixs):
+def k_point_crossover_uniform(
+    critter: np.ndarray, k: int, parent_ixs: np.ndarray
+) -> np.ndarray:
     delta = len(costs) // (k * len(parent_ixs))
     start, end = 0, delta
 
@@ -54,52 +61,53 @@ def k_point_crossover_uniform(critter, k, parent_ixs):
             critter[start:end] = critters[ix][start:end]
             start = end
             end += delta
+    return critter
 
 
 @numba.njit(fastmath=True)
-def select_parents(critters, top_size):
+def select_parents(critters: np.ndarray, top_size: int) -> np.ndarray:
     parent_count = min(top_size, 6)
-
     p_ixs = np.random.randint(0, top_size - 1, parent_count)
-
     return np.unique(p_ixs)
 
 
 @numba.njit(fastmath=True)
-def get_mutation_count(critters, mutation_p):
+def get_mutation_count(critters: np.ndarray, mutation_p: np.ndarray) -> int:
     return max(1, math.ceil(len(critters) * mutation_p))
 
 
 @numba.njit(fastmath=True)
-def mate(critters, top_size, mutation_p):
+def mate(critters: np.ndarray, top_size: int, mutation_p: float) -> np.ndarray:
     mutation_count = get_mutation_count(critters, mutation_p)
-    t_mutation_count = get_mutation_count(critters, mutation_p / 2)
+    t_mutation_count = get_mutation_count(critters, mutation_p / 4)
 
     k = 4
     for n, critter in enumerate(critters):
         if n > top_size:
             parent_ixs = select_parents(critters, top_size)
-            k_point_crossover_uniform(critter, k, parent_ixs)
+            k_point_crossover_random(critter, k, parent_ixs)
             mutate(critter, mutation_count)
-        # elif n != 0:
-        #     mutate(critter, t_mutation_count)
+        elif n != 0:
+            mutate(critter, t_mutation_count)
 
     return critters
 
 
 @numba.njit(fastmath=True, parallel=False)
-def promulgate_critter(max_critter, critters):
+def promulgate_critter(max_critter: np.ndarray, critters: np.ndarray) -> np.ndarray:
     critters[:] = max_critter
     return critters
 
 
 @numba.njit(fastmath=True, parallel=False)
-def norm_fitnessess(fitnessess):
+def norm_fitnessess(fitnessess: np.ndarray) -> np.ndarray:
     return fitnessess ** 2
 
 
 @numba.njit(fastmath=True, parallel=False)
-def cull_mating_pool(critters, fitnessess, mating_pool_size):
+def cull_mating_pool(
+    critters: np.ndarray, fitnessess: np.ndarray, mating_pool_size: int
+) -> np.ndarray:
     normed_fitnessess = norm_fitnessess(fitnessess / fitnessess[0])
     total_fitness = normed_fitnessess.sum()
 
@@ -117,7 +125,12 @@ def cull_mating_pool(critters, fitnessess, mating_pool_size):
 
 
 @numba.njit(fastmath=True, parallel=False)
-def life(critters: List[np.ndarray], n, pop_size, fitness_func):
+def life(
+    critters: np.ndarray,
+    n: int,
+    pop_size: int,
+    fitness_func: Callable[[np.ndarray], float],
+) -> np.ndarray:
     top_size = max(1, pop_size // 5)
 
     mutation_p = 0.01
@@ -179,7 +192,7 @@ def life(critters: List[np.ndarray], n, pop_size, fitness_func):
                 delta = 0
             else:
                 delta += 1
-            
+
             critters[-1] = max_critter
 
         i += 1
@@ -187,7 +200,7 @@ def life(critters: List[np.ndarray], n, pop_size, fitness_func):
     return max_critter
 
 
-def set_buckets(ixs, df: pd.DataFrame):
+def set_buckets(ixs: np.ndarray, df: pd.DataFrame):
     for i in range(ixs.shape[1]):
         mask = ixs[..., i] == 1
         df["bucket"].values[mask] = i
@@ -196,21 +209,24 @@ def set_buckets(ixs, df: pd.DataFrame):
 
 use_last = True
 
-t = int(time.time())
+t = int(datetime.timestamp())
+now = datetime.now().isoformat()
+
 random.seed(t)
 np.random.seed(t)
 
 buckets = 4
 
-tmp_filepath = "data/2021-optimization/tmp.csv"
+dirpath = pathlib.Path("data/2021-optimization")
 
-in_filepath = "data/2021-optimization/in.csv" if not use_last else tmp_filepath
-out_filepath = f"data/2021-optimization/out-{t}.csv"
+tmp_filepath = dirpath.joinpath("tmp.csv")
 
+in_filepath = dirpath.joinpath("in.csv") if not use_last else tmp_filepath
+out_filepath = dirpath.joinpath(f"out-{now}-{t}.csv")
 
 df = pd.read_csv(in_filepath)
 
-init_ixs = df["bucket"].values
+init_buckets = df["bucket"].values
 costs = repeat_expand(df["cost"].values)
 discounts = repeat_expand(df["discount"].values)
 
@@ -234,7 +250,7 @@ n = 1 * (10 ** 7)
 pop_size = 200
 fitness_func = calc_cost
 
-critters = np.asarray([make_ixs(init_ixs, buckets) for _ in range(pop_size)])
+critters = np.asarray([make_ixs(init_buckets, buckets) for _ in range(pop_size)])
 max_critter = life(critters, n, pop_size, fitness_func)
 
 df = set_buckets(max_critter, df)
