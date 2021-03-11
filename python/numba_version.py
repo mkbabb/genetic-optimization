@@ -35,12 +35,15 @@ def k_point_crossover(critter, k, parent_ixs):
     delta = len(costs) // (k * len(parent_ixs))
     start, end = 0, delta
 
-    for _ in range(k):
-        for ix in parent_ixs:
-            critter[start:end] = critters[ix][start:end]
-            start = end
-            end += delta
+    points = np.sort(np.random.randint(0, critters.shape[0], k + 2))
+    
+    points[0] = 0
+    points[-1] = critters.shape[0]
 
+    for i in range(1, k):
+        start, end = points[i - 1], points[i]
+        for ix in parent_ixs:
+            critter[start: end] = critters[ix][start:end]
 
 @numba.njit(fastmath=True)
 def select_parents(critters, top_size):
@@ -211,7 +214,7 @@ def calc_cost(ixs):
 
 
 n = 1 * (10 ** 5)
-pop_size = 500
+pop_size = 100
 fitness_func = calc_cost
 
 critters = np.asarray([make_ixs(init_ixs, buckets) for _ in range(pop_size)])
