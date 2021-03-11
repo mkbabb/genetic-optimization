@@ -23,10 +23,18 @@ def make_ixs(init_buckets: np.ndarray, buckets: int):
 
 
 @numba.njit(fastmath=True, parallel=False)
-def mutate(critter: np.ndarray, mutation_p: float) -> np.ndarray:
-    for _ in range(mutation_p):
-        r = random.randint(0, critters.shape[1] - 1)
-        np.random.shuffle(critter[r])
+def mutate(critter: np.ndarray, mutation_count: int) -> np.ndarray:
+    cost, discount_costs = calc_cost(critter)
+    discount_costs /= cost
+
+    bucket_list = np.arange(critter.shape[1])
+
+    for _ in range(mutation_count):
+        r = random.randint(0, critter.shape[0] - 1)
+        critter[r] = 0
+        i = choice(bucket_list, p=discount_costs)
+        critter[r][i] = 1
+
     return critter
 
 
@@ -105,6 +113,20 @@ def norm_fitnessess(fitnessess: np.ndarray) -> np.ndarray:
 
 
 @numba.njit(fastmath=True, parallel=False)
+def choice(p: np.ndarray, values: np.ndarray = None, size=1):
+    probs = np.cumsum(p)
+    probs /= probs[-1]
+
+    rs = np.random.random(size)
+    ixs = np.searchsorted(probs, rs)
+
+    if values is not None:
+        return values[ixs]
+    else:
+        return ixs
+
+
+@numba.njit(fastmath=True, parallel=False)
 def cull_mating_pool(
     critters: np.ndarray, fitnessess: np.ndarray, mating_pool_size: int
 ) -> np.ndarray:
@@ -131,7 +153,7 @@ def life(
     pop_size: int,
     fitness_func: Callable[[np.ndarray], float],
 ) -> np.ndarray:
-    top_size = max(1, pop_size // 5)
+    top_size = max(1, pop_size // 10)
 
     mutation_p = 0.01
     a, b = mutation_p, 0.2
@@ -139,7 +161,7 @@ def life(
 
     delta = 0
 
-    threshold = 100
+    threshold = 500
     t_threshold = threshold
 
     max_threshold = n // 4
@@ -152,7 +174,7 @@ def life(
     i = 0
     while True:
         for j, critter in enumerate(critters):
-            fitnessess[j] = fitness_func(critter)
+            fitnessess[j], _ = fitness_func(critter)
 
         ixs = np.argsort(-fitnessess)
         fitnessess = fitnessess[ixs]
@@ -192,9 +214,7 @@ def life(
                 delta = 0
             else:
                 delta += 1
-
             critters[-1] = max_critter
-
         i += 1
 
     return max_critter
@@ -233,21 +253,26 @@ discounts = repeat_expand(df["discount"].values)
 
 @numba.njit(fastmath=True, parallel=False)
 def calc_cost(ixs: np.ndarray) -> float:
+    discount_costs = np.zeros(ixs.shape[1])
     total = 0
-    for ix in ixs.T:
+
+    for n, ix in enumerate(ixs.T):
         ix = np.expand_dims(ix, 1)
         z_count = np.count_nonzero(ix)
 
         if z_count > 0:
             avg_discounts = np.round(np.sum(discounts * ix) / z_count) / 100.0
             bucket_costs = np.sum(costs * ix)
+            discount_cost = avg_discounts * bucket_costs
 
-            total += avg_discounts * bucket_costs
-    return total
+            discount_costs[n] = discount_cost
+            total += discount_cost
+
+    return total, discount_costs
 
 
-n = 1 * (10 ** 6)
-pop_size = 500
+n = 1 * (10 ** 7)
+pop_size = 50
 fitness_func = calc_cost
 
 critters = np.asarray([make_ixs(init_buckets, buckets) for _ in range(pop_size)])
