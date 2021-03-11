@@ -44,7 +44,7 @@ def k_point_crossover(critter, k, parents):
 
 @numba.njit(fastmath=True)
 def select_parents(critters, top_size):
-    parent_count = min(top_size, 4)
+    parent_count = min(top_size, 2)
     return [critters[random.randint(0, top_size - 1)] for _ in range(parent_count)]
 
 
@@ -69,7 +69,7 @@ def cull_mating_pool(critters, fitnessess, mating_pool_size):
 @numba.njit(fastmath=True)
 def mate(critters, fitnessess, top_size, mutation_count):
 
-    k = 4
+    k = 2
     for n, critter in enumerate(critters):
         if n > top_size:
             parents = select_parents(critters, top_size)
@@ -188,7 +188,7 @@ def calc_cost(ixs):
     return total
 
 
-n = 1 * (10 ** 6)
+n = 1 * (10 ** 5)
 pop_size = 100
 fitness_func = calc_cost
 
