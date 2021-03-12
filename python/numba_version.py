@@ -74,9 +74,9 @@ def k_point_crossover_uniform(
 
 @numba.njit(fastmath=True)
 def select_parents(critters: np.ndarray, top_size: int) -> np.ndarray:
-    parent_count = min(top_size, 4)
+    parent_count = min(top_size, 2)
     p_ixs = np.random.randint(0, top_size - 1, parent_count)
-    return np.unique(p_ixs)
+    return p_ixs
 
 
 @numba.njit(fastmath=True)
@@ -87,13 +87,13 @@ def get_mutation_count(critters: np.ndarray, mutation_p: np.ndarray) -> int:
 @numba.njit(fastmath=True)
 def mate(critters: np.ndarray, top_size: int, mutation_p: float) -> np.ndarray:
     mutation_count = get_mutation_count(critters, mutation_p)
-    t_mutation_count = get_mutation_count(critters, mutation_p / 1)
+    t_mutation_count = get_mutation_count(critters, mutation_p / 4)
 
     k = 4
     for n, critter in enumerate(critters):
-        if n > top_size:
+        if n >= top_size:
             parent_ixs = select_parents(critters, top_size)
-            k_point_crossover_random(critter, k, parent_ixs)
+            k_point_crossover_uniform(critter, k, parent_ixs)
             mutate(critter, mutation_count)
         else:
             mutate(critter, t_mutation_count)
@@ -109,7 +109,7 @@ def promulgate_critter(max_critter: np.ndarray, critters: np.ndarray) -> np.ndar
 
 @numba.njit(fastmath=True, parallel=False)
 def norm_fitnessess(fitnessess: np.ndarray) -> np.ndarray:
-    return fitnessess ** 100
+    return fitnessess
 
 
 @numba.njit(fastmath=True, parallel=False)
@@ -151,17 +151,17 @@ def life(
     top_size = max(1, pop_size // 10)
 
     mutation_p = 0.01
-    a, b = mutation_p, 0.03
+    a, b = mutation_p, 0.1
     t_b = a
 
     t_mutation_p = mutation_p
 
     delta = 0
 
-    threshold = 200
+    threshold = 100
     t_threshold = threshold
 
-    max_threshold = n // 8
+    max_threshold = n // 6
 
     max_fitness = 0
     fitnessess = np.zeros(pop_size)
@@ -204,12 +204,14 @@ def life(
 
                     t_threshold = threshold
                     t_mutation_p = mutation_p
+                else:
+                    critters = cull_mating_pool(critters, fitnessess, top_size)
                 delta = 0
             else:
                 delta += 1
 
-            critters = cull_mating_pool(critters, fitnessess, top_size)
             critters = mate(critters, top_size, t_mutation_p)
+            critters[0] = max_critter
 
         i += 1
 
@@ -257,7 +259,7 @@ def calc_cost(ixs: np.ndarray) -> float:
         z_count = np.count_nonzero(ix)
 
         if z_count > 0:
-            avg_discounts = np.round(np.sum(discounts * ix) / z_count / 100.0, 2)
+            avg_discounts = np.round(np.sum(discounts * ix) / z_count) / 100.0
             bucket_costs = np.sum(costs * ix)
             discount_cost = avg_discounts * bucket_costs
 
