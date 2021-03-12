@@ -1,3 +1,4 @@
+import math
 import random
 from typing import *
 from datetime import datetime
@@ -16,7 +17,6 @@ def repeat_expand(x: np.ndarray) -> np.ndarray:
     return np.repeat(x.reshape((-1, 1)), 1, axis=1)
 
 
-@numba.njit(fastmath=True)
 def make_ixs(init_buckets: np.ndarray, buckets: int):
     ixs = np.full((init_buckets.size, buckets), 0)
     for i in range(buckets):
@@ -33,27 +33,22 @@ def set_buckets(ixs: np.ndarray, df: pd.DataFrame):
 
 
 @numba.njit(fastmath=True, parallel=False)
-def calc_cost(
-    costs: np.ndarray, discounts: np.ndarray
-) -> Callable[[np.ndarray], float]:
-    def inner(ixs):
-        global costs, discounts
-        total = 0
+def calc_cost(ixs: np.ndarray) -> float:
+    global costs, discounts
+    total = 0
 
-        for n, ix in enumerate(ixs.T):
-            ix = np.expand_dims(ix, 1)
-            z_count = np.count_nonzero(ix)
+    for n, ix in enumerate(ixs.T):
+        ix = np.expand_dims(ix, 1)
+        z_count = np.count_nonzero(ix)
 
-            if z_count > 0:
-                avg_discounts = np.round(np.sum(discounts * ix) / z_count) / 100.0
-                bucket_costs = np.sum(costs * ix)
-                discount_cost = avg_discounts * bucket_costs
+        if z_count > 0:
+            avg_discounts = np.round(np.sum(discounts * ix) / z_count) / 100.0
+            bucket_costs = np.sum(costs * ix)
+            discount_cost = avg_discounts * bucket_costs
 
-                total += discount_cost
+            total += discount_cost
 
-        return total
-
-    return inner
+    return total
 
 
 def main():
@@ -64,7 +59,7 @@ def main():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-n", default=10 ** 5)
+    parser.add_argument("-n", default=10 ** 6)
     parser.add_argument("--pop_size", default=100)
     parser.add_argument("--buckets", default=4)
     parser.add_argument("--seed", default=t)
@@ -102,7 +97,7 @@ def main():
     costs = repeat_expand(df["cost"].values)
     discounts = repeat_expand(df["discount"].values)
 
-    fitness_func = calc_cost(costs, discounts)
+    fitness_func = calc_cost
 
     critters = np.asarray(
         [make_ixs(init_buckets, args.buckets) for _ in range(args.pop_size)]

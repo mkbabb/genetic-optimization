@@ -1,30 +1,29 @@
 import math
 import random
 from typing import *
-from datetime import datetime
 
 import numba
 import numpy as np
 
 
-@numba.njit(fastmath=True, parallel=False)
+@numba.njit(cache=False, fastmath=True, parallel=False)
 def mutate(critter: np.ndarray, mutation_count: int) -> np.ndarray:
-    cost, discount_costs = calc_cost(critter)
-    discount_costs /= cost
-    discount_costs = 1 - discount_costs
+    # cost, discount_costs = calc_cost(critter)
+    # discount_costs /= cost
+    # discount_costs = 1 - discount_costs
 
     for _ in range(mutation_count):
         r = random.randint(0, critter.shape[0] - 1)
-        # np.random.shuffle(critter[r])
-        critter[r] = 0
+        np.random.shuffle(critter[r])
 
-        i = choice(p=discount_costs)
-        critter[r][i] = 1
+        # critter[r] = 0
+        # i = choice(p=discount_costs)
+        # critter[r][i] = 1
 
     return critter
 
 
-@numba.njit(fastmath=True, parallel=False)
+@numba.njit(cache=False, fastmath=True, parallel=False)
 def k_point_crossover_random(
     critter: np.ndarray, k: int, parent_ixs: np.ndarray, critters: np.ndarray
 ) -> np.ndarray:
@@ -43,7 +42,7 @@ def k_point_crossover_random(
     return critter
 
 
-@numba.njit(fastmath=True, parallel=False)
+@numba.njit(cache=False, fastmath=True, parallel=False)
 def k_point_crossover_uniform(
     critter: np.ndarray, k: int, parent_ixs: np.ndarray, critters: np.ndarray
 ) -> np.ndarray:
@@ -58,19 +57,19 @@ def k_point_crossover_uniform(
     return critter
 
 
-@numba.njit(fastmath=True)
+@numba.njit(cache=False, fastmath=True)
 def select_parents(critters: np.ndarray, top_size: int) -> np.ndarray:
     parent_count = min(top_size, 2)
     p_ixs = np.random.randint(0, top_size - 1, parent_count)
     return p_ixs
 
 
-@numba.njit(fastmath=True)
+@numba.njit(cache=False, fastmath=True)
 def get_mutation_count(critters: np.ndarray, mutation_p: np.ndarray) -> int:
     return max(1, math.ceil(len(critters) * mutation_p))
 
 
-@numba.njit(fastmath=True)
+@numba.njit(cache=False, fastmath=True)
 def mate(critters: np.ndarray, top_size: int, mutation_p: float) -> np.ndarray:
     mutation_count = get_mutation_count(critters, mutation_p)
     t_mutation_count = get_mutation_count(critters, mutation_p / 4)
@@ -88,18 +87,18 @@ def mate(critters: np.ndarray, top_size: int, mutation_p: float) -> np.ndarray:
     return critters
 
 
-@numba.njit(fastmath=True, parallel=False)
+@numba.njit(cache=False, fastmath=True, parallel=False)
 def promulgate_critter(max_critter: np.ndarray, critters: np.ndarray) -> np.ndarray:
     critters[:] = max_critter
     return critters
 
 
-@numba.njit(fastmath=True, parallel=False)
+@numba.njit(cache=False, fastmath=True, parallel=False)
 def norm_fitnessess(fitnessess: np.ndarray) -> np.ndarray:
     return fitnessess
 
 
-@numba.njit(fastmath=True, parallel=False)
+@numba.njit(cache=False, fastmath=True, parallel=False)
 def choice(p: np.ndarray, values: np.ndarray = None, size=1):
     probs = np.cumsum(p)
     probs /= probs[-1]
@@ -113,7 +112,7 @@ def choice(p: np.ndarray, values: np.ndarray = None, size=1):
         return ixs
 
 
-@numba.njit(fastmath=True, parallel=False)
+@numba.njit(cache=False, fastmath=True, parallel=False)
 def proportionate_selection(
     critters: np.ndarray, fitnessess: np.ndarray, mating_pool_size: int
 ) -> np.ndarray:
@@ -128,7 +127,7 @@ def proportionate_selection(
     return critters[ixs]
 
 
-@numba.njit(fastmath=True, parallel=False)
+@numba.njit(cache=False, fastmath=True, parallel=False)
 def life(
     critters: np.ndarray,
     n: int,
