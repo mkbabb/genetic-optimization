@@ -142,7 +142,7 @@ def setup(**kwargs) -> dict:
 
 def run(**kwargs) -> None:
     kwargs = setup(**kwargs)
-    erate_genetic(life_loop=life_v0, fitness_func=calc_cost, **kwargs)
+    erate_genetic(life_loop=life_v1, fitness_func=calc_cost, **kwargs)
 
 
 def main() -> None:
