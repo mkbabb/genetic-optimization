@@ -178,7 +178,14 @@ def life(
             t_mutation_p = mutation_p
         else:
             if delta > t_threshold:
-                print("\t", i, " skipping, delta is:", delta, t_threshold, t_mutation_p)
+                print(
+                    "\t",
+                    i,
+                    " skipping, delta is:",
+                    delta,
+                    round(t_threshold, 4),
+                    round(t_mutation_p, 4),
+                )
 
                 t_mutation_p = random.random() * (t_b - a) + a
                 t_threshold = min(t_threshold * 1.5, max_threshold)
