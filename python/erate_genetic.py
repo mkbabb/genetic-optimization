@@ -1,270 +1,121 @@
-import math
 import random
-import timeit
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import *
+from datetime import datetime
 
-
+import numba
 import numpy as np
 import pandas as pd
-from scipy.signal import fftconvolve
-from matplotlib import pyplot as plt
-
-SEED = 0xDEADBEEF
-
-np.random.seed(SEED)
-random.seed(SEED)
+import pathlib
+import argparse
 
 
-def swap(arr, ix1, ix2):
-    t = arr[ix1]
-    arr[ix1] = arr[ix2]
-    arr[ix2] = t
+from numba_optimizer_v1 import life as life1
 
 
-def knuth_shuffle(arr):
-    for i in range(len(arr)):
-        swap(arr, i, random.randint(0, i))
+def repeat_expand(x: np.ndarray) -> np.ndarray:
+    return np.repeat(x.reshape((-1, 1)), 1, axis=1)
 
 
-def sigmoid(x):
-    return 1 / (1 + math.exp(-x))
+@numba.njit(fastmath=True)
+def make_ixs(init_buckets: np.ndarray, buckets: int):
+    ixs = np.full((init_buckets.size, buckets), 0)
+    for i in range(buckets):
+        mask = init_buckets == i
+        ixs[mask, i] = 1
+    return ixs
 
 
-class Critter(object):
-    def __init__(self, N):
-        self.genes: List[List[int]] = [[0, 0] for i in range(N)]
-        self.fitness: float = 0
-
-    def __repr__(self):
-        return f"{self.fitness}"
+def set_buckets(ixs: np.ndarray, df: pd.DataFrame):
+    for i in range(ixs.shape[1]):
+        mask = ixs[..., i] == 1
+        df["bucket"].values[mask] = i
+    return df
 
 
-def calc_erate_stats(data: pd.DataFrame,
-                     critter: Critter,
-                     buckets: Dict[int, Dict[str, float]],
-                     max_bucket: int,
-                     full_buckets: List[bool]) -> None:
-    N = len(data)
-    bucket_count = len(buckets)
-    for j in range(N):
-        k = critter.genes[j][1]\
-            if critter.genes[j][0]\
-            else random.randint(0, bucket_count - 1)
+@numba.njit(fastmath=True, parallel=False)
+def calc_cost(
+    costs: np.ndarray, discounts: np.ndarray
+) -> Callable[[np.ndarray], float]:
+    def inner(ixs):
+        global costs, discounts
+        total = 0
 
-        if (full_buckets[k]):
-            while (full_buckets[k]):
-                k = random.randint(0, bucket_count - 1)
+        for n, ix in enumerate(ixs.T):
+            ix = np.expand_dims(ix, 1)
+            z_count = np.count_nonzero(ix)
 
-        buckets[k]["total_cost"] += data.loc[j, "cost"]
-        buckets[k]["total_discount"] += data.loc[j, "discount"]
-        buckets[k]["count"] += 1
+            if z_count > 0:
+                avg_discounts = np.round(np.sum(discounts * ix) / z_count) / 100.0
+                bucket_costs = np.sum(costs * ix)
+                discount_cost = avg_discounts * bucket_costs
 
-        if (buckets[k]["count"] > max_bucket):
-            full_buckets[k] = True
+                total += discount_cost
 
-        critter.genes[j][1] = k
+        return total
 
-    t: float = 0
-    for j in range(bucket_count):
-        b = buckets[j]
-        if (b["count"] > 0):
-            b["average_discount"] = round(
-                b["total_discount"] / (100 * b["count"]), 2)
-            b["discount_cost"] = round(
-                b["average_discount"] * b["total_cost"])
-
-        t += b["discount_cost"]
-
-        for key in b.keys():
-            b[key] = 0
-
-        full_buckets[j] = False
-
-    critter.fitness = float(t)
+    return inner
 
 
-def and_critter(critter1: Critter,
-                critter2: Critter) -> None:
-    for i in range(len(critter1.genes)):
-        critter1.genes[i][0] &= critter2.genes[i][0]
+def main():
+    global costs, discounts
 
+    t = int(datetime.now().timestamp())
+    now = datetime.now().isoformat()
 
-def mate_critters(data: pd.DataFrame,
-                  critters: List[Critter],
-                  max_fitness: float,
-                  mutation_count: int,
-                  parent_count: int = 2) -> List[Critter]:
-    N = len(data)
-    L = len(critters)
+    parser = argparse.ArgumentParser()
 
-    ratio: float = 0
-    for i in range(L):
-        if (critters[i].fitness > 0):
-            critters[i].fitness = (critters[i].fitness / max_fitness - 0.9) * 10
-            if (critters[i].fitness > 0):
-                ratio += 1 / critters[i].fitness
+    parser.add_argument("-n", default=10 ** 5)
+    parser.add_argument("--pop_size", default=100)
+    parser.add_argument("--buckets", default=4)
+    parser.add_argument("--seed", default=t)
+
+    parser.add_argument("--dirpath", default="data/2021-optimization")
+    parser.add_argument("-i", "--in_filepath", default=None)
+
+    args = parser.parse_args()
+
+    dirpath = pathlib.Path(args.dirpath)
+
+    tmp_filepath = dirpath.joinpath("tmp.csv")
+    out_filepath = dirpath.joinpath(f"out-{now}-{t}.csv")
+
+    def get_in_filepath_seed():
+        if args.in_filepath is None:
+            return args.seed, tmp_filepath
+        else:
+            path = pathlib.Path(args.in_filepath)
+
+            if len((comps := path.name.split("-"))) == 3:
+                _, _, f_seed = comps
+                return int(f_seed), path
             else:
-                ratio += 0
-    critters = sorted(critters, key=lambda x: x.fitness, reverse=True)
+                return args.seed, path
 
-    M = int(L * ratio)
-    weights: Dict[int, int] = {}
-    k = 0
-    for i in range(L):
-        count = int(M * critters[i].fitness)
-        for j in range(count):
-            weights[k] = i
-            k += 1
+    seed, in_filepath = get_in_filepath_seed()
 
-    children = critters[:parent_count]
-    for i in range(L - parent_count):
-        child = Critter(N)
+    random.seed(seed)
+    np.random.seed(seed)
 
-        for j in range(parent_count):
-            r = random.randrange(0, L)
-            parent = critters[r]
-            if (j == 0):
-                child.genes = list(parent.genes)
-            else:
-                and_critter(child, parent)
+    df = pd.read_csv(in_filepath)
 
-        for j in range(mutation_count):
-            k = random.randrange(0, N)
-            child.genes[k][0] = random.randint(0, 1)
+    init_buckets = df["bucket"].values
+    costs = repeat_expand(df["cost"].values)
+    discounts = repeat_expand(df["discount"].values)
 
-        children.append(child)
+    fitness_func = calc_cost(costs, discounts)
 
-    return children
+    critters = np.asarray(
+        [make_ixs(init_buckets, args.buckets) for _ in range(args.pop_size)]
+    )
+
+    life = life1
+
+    max_critter = life(critters, args.n, args.pop_size, fitness_func)
+
+    df = set_buckets(max_critter, df)
+    df.to_csv(out_filepath, index=False)
+    df.to_csv(tmp_filepath, index=False)
 
 
-def optimize_buckets(data: pd.DataFrame,
-                     bucket_count: int,
-                     max_bucket: int,
-                     population_size: int = 10,
-                     mutation_rate: float = 0.1,
-                     parent_count: int = 2,
-                     iterations: int = 1000) -> List[Dict[str, Union[int, float]]]:
-    N = len(data)
-    max_bucket = max(max_bucket, N // bucket_count)
-    buckets: Dict[int, Dict[str, float]] = {i: {"average_discount": 0,
-                                                "total_discount": 0,
-                                                "total_cost": 0,
-                                                "discount_cost": 0,
-                                                "count": 0} for i in range(bucket_count)}
-    full_buckets = [False for i in range(bucket_count)]
-
-    extremal_fitness: float = 0.1
-    mutation_count = int(math.ceil(N * mutation_rate))
-
-    critters = [Critter(N) for i in range(population_size)]
-
-    for i in range(iterations):
-        for j in range(population_size):
-            critter = critters[j]
-
-            calc_erate_stats(data,
-                             critter,
-                             buckets,
-                             max_bucket,
-                             full_buckets)
-
-            if (critter.fitness > extremal_fitness):
-                extremal_fitness = critter.fitness
-                print(f"-{i}-")
-                print(f"discount total: {extremal_fitness}")
-                for i in range(N):
-                    print(
-                        f"lea: {data.loc[i, 'lea-number']}, bucket: {critter.genes[i][1]}")
-                    critter.genes[i][0] = 1
-        print("---")
-        # for j in range(population_size):
-        #     print(critters[j].fitness / extremal_fitness)
-
-        critters = mate_critters(data,
-                                 critters,
-                                 extremal_fitness,
-                                 mutation_count,
-                                 parent_count)
-
-
-def shuffle_buckets(arr: np.ndarray,
-                    intervals: List[int]) -> List[np.ndarray]:
-    np.random.shuffle(arr)
-    buckets = []
-    start = 0
-    for i in intervals:
-        buckets.append(np.sort(arr[start:i + start].astype(int)))
-        start += i
-    return buckets
-
-
-def gradient_descent(x, y, gamma, iterations):
-    N = len(x)
-    a_n = np.zeros((x.shape[1], 1))
-    for i in range(0, iterations):
-        gradient = x.T @ (x @ a_n - y) / (2 * N)
-        a_n = a_n - gamma * gradient
-    error = 1 - np.sum((x @ a_n - y) ** 2) / np.sum((np.average(y) - y)**2)
-    return a_n, error
-
-
-def linest(y, x=None, plot=False, c="r-"):
-    N = len(y)
-    if (x is None):
-        x = np.arange(N).reshape((-1, 1)) + 1
-    pts, error = gradient_descent(
-        np.hstack((np.ones(x.shape), x)),
-        y,
-        0.0001,
-        10000)
-    if (plot):
-        plt.plot(x, y, "x")
-        plt.plot(x, x * pts[1] + pts[0], c)
-    return pts, error
-
-
-def test_rand(N, b, plot=False):
-    arr = np.arange(N)
-    intervals = [N // b for i in range(b)]
-
-    t: Dict[int, List[int]] = {i: [] for i in range(b)}
-
-    for i in range(N):
-        j = random.randrange(0, b)
-        t[j].append(i)
-
-    e1 = 0
-    for i in range(b):
-        y = np.asarray(t[i]).reshape((-1, 1))
-        pts, error = linest(y, None, plot, "-b")
-        e1 += error
-    e1 /= b
-
-    e2 = 0
-    buckets = shuffle_buckets(arr, intervals)
-    for i in range(b):
-        y = np.asarray(buckets[i]).reshape((-1, 1))
-        pts, error = linest(y, None, plot)
-        e2 += error
-    e2 /= b
-
-    print(e1, e2)
-
-    if (plot):
-        plt.show()
-
-# test_rand(1000, 5, True)
-
-
-# data = pd.read_csv("erate-data-2015.csv",
-#                    header=0)
-# print(data)
-
-# optimize_buckets(data,
-#                  bucket_count=2,
-#                  max_bucket=100,
-#                  population_size=100,
-#                  mutation_rate=0.3,
-#                  parent_count=2,
-#                  iterations=1000)
+if __name__ == "__main__":
+    main()

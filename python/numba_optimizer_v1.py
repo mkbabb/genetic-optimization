@@ -5,49 +5,35 @@ from datetime import datetime
 
 import numba
 import numpy as np
-import pandas as pd
-import pathlib
-
-
-def repeat_expand(x: np.ndarray) -> np.ndarray:
-    return np.repeat(x.reshape((-1, 1)), 1, axis=1)
-
-
-@numba.njit(fastmath=True)
-def make_ixs(init_buckets: np.ndarray, buckets: int):
-    ixs = np.full((init_buckets.size, buckets), 0)
-    for i in range(buckets):
-        mask = init_buckets == i
-        ixs[mask, i] = 1
-    return ixs
 
 
 @numba.njit(fastmath=True, parallel=False)
 def mutate(critter: np.ndarray, mutation_count: int) -> np.ndarray:
-    # cost, discount_costs = calc_cost(critter)
-    # discount_costs /= cost
-    # discount_costs = 1 - discount_costs
+    cost, discount_costs = calc_cost(critter)
+    discount_costs /= cost
+    discount_costs = 1 - discount_costs
 
     for _ in range(mutation_count):
         r = random.randint(0, critter.shape[0] - 1)
-        np.random.shuffle(critter[r])
-        # critter[r] = 0
+        # np.random.shuffle(critter[r])
+        critter[r] = 0
 
-        # i = choice(p=discount_costs)
-        # critter[r][i] = 1
+        i = choice(p=discount_costs)
+        critter[r][i] = 1
 
     return critter
 
 
 @numba.njit(fastmath=True, parallel=False)
 def k_point_crossover_random(
-    critter: np.ndarray, k: int, parent_ixs: np.ndarray
+    critter: np.ndarray, k: int, parent_ixs: np.ndarray, critters: np.ndarray
 ) -> np.ndarray:
+    points = np.sort(np.random.randint(0, critter.shape[0] - 1, k + 2))
 
-    points = np.sort(np.random.randint(0, critters.shape[1] - 1, k + 1))
     points[0] = 0
+    points[-1] = critter.shape[0]
 
-    for i in range(1, k + 1):
+    for i in range(1, k + 2):
         start, end = points[i - 1], points[i]
 
         parent = critters[parent_ixs[0]]
@@ -59,7 +45,7 @@ def k_point_crossover_random(
 
 @numba.njit(fastmath=True, parallel=False)
 def k_point_crossover_uniform(
-    critter: np.ndarray, k: int, parent_ixs: np.ndarray
+    critter: np.ndarray, k: int, parent_ixs: np.ndarray, critters: np.ndarray
 ) -> np.ndarray:
     delta = len(costs) // (k * len(parent_ixs))
     start, end = 0, delta
@@ -93,10 +79,11 @@ def mate(critters: np.ndarray, top_size: int, mutation_p: float) -> np.ndarray:
     for n, critter in enumerate(critters):
         if n >= top_size:
             parent_ixs = select_parents(critters, top_size)
-            k_point_crossover_uniform(critter, k, parent_ixs)
-            mutate(critter, mutation_count)
+            critter = k_point_crossover_random(critter, k, parent_ixs, critters)
+            critter = mutate(critter, mutation_count)
         else:
-            mutate(critter, t_mutation_count)
+            critter = mutate(critter, t_mutation_count)
+        critters[n] = critter
 
     return critters
 
@@ -127,7 +114,7 @@ def choice(p: np.ndarray, values: np.ndarray = None, size=1):
 
 
 @numba.njit(fastmath=True, parallel=False)
-def cull_mating_pool(
+def proportionate_selection(
     critters: np.ndarray, fitnessess: np.ndarray, mating_pool_size: int
 ) -> np.ndarray:
     normed_fitnessess = norm_fitnessess(fitnessess / fitnessess[0])
@@ -171,7 +158,7 @@ def life(
     i = 0
     while True:
         for j, critter in enumerate(critters):
-            fitnessess[j], _ = fitness_func(critter)
+            fitnessess[j] = fitness_func(critter)
 
         ixs = np.argsort(-fitnessess)
         fitnessess = fitnessess[ixs]
@@ -196,6 +183,7 @@ def life(
 
                 t_mutation_p = random.random() * (t_b - a) + a
                 t_threshold = min(t_threshold * 1.5, max_threshold)
+
                 t_b = min(t_b * 1.1, b)
 
                 if delta >= max_threshold:
@@ -205,7 +193,7 @@ def life(
                     t_threshold = threshold
                     t_mutation_p = mutation_p
                 else:
-                    critters = cull_mating_pool(critters, fitnessess, top_size)
+                    critters = proportionate_selection(critters, fitnessess, top_size)
                 delta = 0
             else:
                 delta += 1
@@ -216,66 +204,3 @@ def life(
         i += 1
 
     return max_critter
-
-
-def set_buckets(ixs: np.ndarray, df: pd.DataFrame):
-    for i in range(ixs.shape[1]):
-        mask = ixs[..., i] == 1
-        df["bucket"].values[mask] = i
-    return df
-
-
-use_last = False
-
-t = int(datetime.now().timestamp())
-now = datetime.now().isoformat()
-
-random.seed(t)
-np.random.seed(t)
-
-buckets = 4
-
-dirpath = pathlib.Path("data/2021-optimization")
-
-tmp_filepath = dirpath.joinpath("tmp.csv")
-
-in_filepath = dirpath.joinpath("in.csv") if not use_last else tmp_filepath
-out_filepath = dirpath.joinpath(f"out-{now}-{t}.csv")
-
-df = pd.read_csv(in_filepath)
-
-init_buckets = df["bucket"].values
-costs = repeat_expand(df["cost"].values)
-discounts = repeat_expand(df["discount"].values)
-
-
-@numba.njit(fastmath=True, parallel=False)
-def calc_cost(ixs: np.ndarray) -> float:
-    discount_costs = np.zeros(ixs.shape[1])
-    total = 0
-
-    for n, ix in enumerate(ixs.T):
-        ix = np.expand_dims(ix, 1)
-        z_count = np.count_nonzero(ix)
-
-        if z_count > 0:
-            avg_discounts = np.round(np.sum(discounts * ix) / z_count) / 100.0
-            bucket_costs = np.sum(costs * ix)
-            discount_cost = avg_discounts * bucket_costs
-
-            discount_costs[n] = discount_cost
-            total += discount_cost
-
-    return total, discount_costs
-
-
-n = 1 * (10 ** 6)
-pop_size = 100
-fitness_func = calc_cost
-
-critters = np.asarray([make_ixs(init_buckets, buckets) for _ in range(pop_size)])
-max_critter = life(critters, n, pop_size, fitness_func)
-
-df = set_buckets(max_critter, df)
-df.to_csv(out_filepath, index=False)
-df.to_csv(tmp_filepath, index=False)
