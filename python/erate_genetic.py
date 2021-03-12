@@ -1,4 +1,3 @@
-import math
 import random
 from typing import *
 from datetime import datetime
@@ -10,7 +9,11 @@ import pathlib
 import argparse
 
 
-from numba_optimizer_v1 import life as life1
+from numba_optimizer_v0 import life as life_v0
+from numba_optimizer_v1 import life as life_v1
+
+
+FitnessFunc = Callable[[np.ndarray], float]
 
 
 def repeat_expand(x: np.ndarray) -> np.ndarray:
@@ -51,45 +54,18 @@ def calc_cost(ixs: np.ndarray) -> float:
     return total
 
 
-def main():
+def erate_genetic(
+    buckets: int,
+    n: int,
+    pop_size: int,
+    life_loop: Callable,
+    fitness_func: FitnessFunc,
+    in_filepath: pathlib.Path,
+    out_filepath: pathlib.Path,
+    tmp_filepath: pathlib.Path,
+    **kwargs,
+) -> None:
     global costs, discounts
-
-    t = int(datetime.now().timestamp())
-    now = datetime.now().isoformat()
-
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument("-n", default=10 ** 6)
-    parser.add_argument("--pop_size", default=100)
-    parser.add_argument("--buckets", default=4)
-    parser.add_argument("--seed", default=t)
-
-    parser.add_argument("--dirpath", default="data/2021-optimization")
-    parser.add_argument("-i", "--in_filepath", default=None)
-
-    args = parser.parse_args()
-
-    dirpath = pathlib.Path(args.dirpath)
-
-    tmp_filepath = dirpath.joinpath("tmp.csv")
-    out_filepath = dirpath.joinpath(f"out-{now}-{t}.csv")
-
-    def get_in_filepath_seed():
-        if args.in_filepath is None:
-            return args.seed, tmp_filepath
-        else:
-            path = pathlib.Path(args.in_filepath)
-
-            if len((comps := path.name.split("-"))) == 3:
-                _, _, f_seed = comps
-                return int(f_seed), path
-            else:
-                return args.seed, path
-
-    seed, in_filepath = get_in_filepath_seed()
-
-    random.seed(seed)
-    np.random.seed(seed)
 
     df = pd.read_csv(in_filepath)
 
@@ -97,19 +73,95 @@ def main():
     costs = repeat_expand(df["cost"].values)
     discounts = repeat_expand(df["discount"].values)
 
-    fitness_func = calc_cost
+    critters = np.asarray([make_ixs(init_buckets, buckets) for _ in range(pop_size)])
 
-    critters = np.asarray(
-        [make_ixs(init_buckets, args.buckets) for _ in range(args.pop_size)]
+    max_critter = life_loop(
+        critters=critters,
+        n=n,
+        pop_size=pop_size,
+        fitness_func=fitness_func,
     )
-
-    life = life1
-
-    max_critter = life(critters, args.n, args.pop_size, fitness_func)
 
     df = set_buckets(max_critter, df)
     df.to_csv(out_filepath, index=False)
     df.to_csv(tmp_filepath, index=False)
+
+
+def meta_erate_genetic():
+    pass
+
+
+def setup(**kwargs) -> dict:
+    t = int(datetime.now().timestamp())
+    now = datetime.now()
+
+    defaults = dict(
+        n=10 ** 6,
+        pop_size=100,
+        seed=t,
+        thread_number="",
+        dirpath=f"data/{now.year}-optimization",
+    )
+    defaults.update(kwargs)
+    kwargs = defaults
+
+    dirpath = pathlib.Path(kwargs.get("dirpath")).joinpath(kwargs.get("thread_number"))
+    dirpath.mkdir(parents=True, exist_ok=True)
+
+    tmp_filepath = dirpath.joinpath("tmp.csv")
+    out_filepath = dirpath.joinpath(f"out-{now.isoformat()}-{t}.csv")
+
+    def get_in_filepath_seed():
+        if "in_filepath" not in kwargs:
+            return kwargs.get("seed"), tmp_filepath
+        else:
+            path = pathlib.Path(kwargs.get("in_filepath"))
+
+            if len((comps := path.name.split("-"))) == 3:
+                _, _, f_seed = comps
+                return int(f_seed), path
+            else:
+                return kwargs.get("seed"), path
+
+    seed, in_filepath = get_in_filepath_seed()
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    kwargs.update(
+        dict(
+            in_filepath=in_filepath,
+            tmp_filepath=tmp_filepath,
+            out_filepath=out_filepath,
+            dirpath=dirpath,
+        )
+    )
+
+    return kwargs
+
+
+def run(**kwargs) -> None:
+    kwargs = setup(**kwargs)
+    erate_genetic(life_loop=life_v0, fitness_func=calc_cost, **kwargs)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-n", "--n", type=int)
+    parser.add_argument("--pop_size", type=int)
+    parser.add_argument("--buckets", default=4, type=int)
+    parser.add_argument("--seed", type=int)
+
+    parser.add_argument("--thread_number", type=str)
+
+    parser.add_argument("--dirpath")
+    parser.add_argument("-i", "--in_filepath")
+
+    args = parser.parse_args()
+    kwargs = {k: v for k, v in args.__dict__.items() if v is not None}
+
+    run(**kwargs)
 
 
 if __name__ == "__main__":
