@@ -5,8 +5,8 @@ import time
 import tomllib
 from typing import *
 
-import pandas as pd
-from googleapiutils2 import Drive, Sheets, get_oauth2_creds
+
+from googleapiutils2 import Drive, Sheets
 from loguru import logger
 
 
@@ -26,6 +26,7 @@ def sync_sheet_csv(
                 )
             )
             df.to_csv(file_path, index=False)
+            logger.info(f"Updated {file_path} from {file_id}! {range_name}")
         except Exception as e:
             logger.error(e)
             pass
