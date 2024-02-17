@@ -346,7 +346,7 @@ fn run_genetic_algorithm(
             }
         }
 
-        let exponent = (gen as u32 / 5).min(max_exponent);
+        let exponent = (gen as u32 / 7).min(max_exponent);
 
         if no_improvement_counter >= 2_usize.pow(exponent) {
             println!("Resetting population to previous best solution due to stagnation.");
