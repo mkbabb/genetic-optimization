@@ -1,1 +1,0 @@
-clang++ -fcoroutines-ts -stdlib=libc++ -std=c++2a -O3 -lpthread src/tests.cpp -o erate.so

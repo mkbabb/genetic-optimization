@@ -1,0 +1,12 @@
+[google]
+optimization_sheet_id = "https://docs.google.com/spreadsheets/d/1DdZmbo3tvtrb8fNfgTdgmOpjX-XoKhTcQa1hQLlffPE/edit#gid=769220148"
+input_range_name = "Output"
+output_range_name = "Output"
+
+[genetic_algorithm]
+pop_size = 2000
+k = 10
+mutation_rate = 0.01
+generations = 100000
+num_parents = 2
+num_top_parents = 2

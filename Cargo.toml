@@ -1,0 +1,17 @@
+[package]
+name = "erate-optimization"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ndarray = "0.15"
+ndarray-rand = "0.13"
+rand = "0.8"
+rayon = "1.5"
+csv = "1"
+polars = { version = "0.15", features = ["csv-file", "lazy"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8.10"
+

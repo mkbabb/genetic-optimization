@@ -12,3 +12,8 @@ my_venv/
 **/data/
 __pycache__/
 build/
+
+
+# Added by cargo
+
+/target
