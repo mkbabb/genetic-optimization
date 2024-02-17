@@ -10,12 +10,12 @@ from googleapiutils2 import Drive, Sheets
 from loguru import logger
 
 
-def sync_sheet_csv(
+def update_sheet_csv(
     file_path: pathlib.Path,
     file_id: str,
     range_name: str,
     sheets: Sheets,
-    interval: float = 1.0,
+    interval: float = 2.0,
 ):
     while True:
         try:
@@ -47,7 +47,7 @@ input_range_name = config["google"]["input_range_name"]
 
 file_path = pathlib.Path("./data/input.csv")
 
-sync_sheet_csv(
+update_sheet_csv(
     file_path=file_path,
     file_id=optimization_sheet_id,
     range_name=input_range_name,

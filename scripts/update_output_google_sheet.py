@@ -17,17 +17,19 @@ def watch_file(
     check_interval: float = 1.0,
 ) -> None:
     last_modified_time = os.path.getmtime(file_path)
+    run_again = False
 
     while True:
         try:
             current_modified_time = os.path.getmtime(file_path)
-            if current_modified_time != last_modified_time:
+            if run_again or current_modified_time != last_modified_time:
 
                 fn(file_path)
 
                 last_modified_time = current_modified_time
         except Exception as e:
             logger.error(e)
+            run_again = True
             pass
 
         time.sleep(check_interval)
