@@ -2,7 +2,7 @@ use ndarray::Array2;
 use serde::Deserialize;
 use std::path::Path;
 use std::sync::Arc;
-use std::{path::PathBuf, process::Command};
+use std::{process::Command};
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct Config {

@@ -2,7 +2,7 @@ pub mod genetic;
 pub mod utils;
 
 use crate::genetic::{
-    gaussian_mutation, k_point_crossover, mutation, rank_selection, roulette_wheel_selection,
+    k_point_crossover, mutation,
     run_genetic_algorithm, tournament_selection,
 };
 use crate::utils::Config;

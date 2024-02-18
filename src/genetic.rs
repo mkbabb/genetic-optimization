@@ -111,11 +111,10 @@ pub fn tournament_selection(
 
     let selected_indices: Vec<_> = (0..population.len()).choose_multiple(&mut rng, tournament_size);
 
-    let best_index = selected_indices
+    let best_index = *selected_indices
         .iter()
         .max_by(|&&x, &&y| fitnesses[x].partial_cmp(&fitnesses[y]).unwrap())
-        .unwrap()
-        .clone();
+        .unwrap();
 
     population[best_index].clone()
 }
