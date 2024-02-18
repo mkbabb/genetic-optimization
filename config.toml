@@ -6,7 +6,7 @@ output_range_name = "Output"
 [genetic_algorithm]
 pop_size = 1000
 k = 10
-mutation_rate = 0.01
+mutation_rate = 0.015
 generations = 10000000
 num_parents = 10
 num_top_parents = 10

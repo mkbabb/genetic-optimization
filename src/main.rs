@@ -1,10 +1,7 @@
 pub mod genetic;
 pub mod utils;
 
-use crate::genetic::{
-    k_point_crossover, mutation,
-    run_genetic_algorithm, tournament_selection,
-};
+use crate::genetic::{k_point_crossover, mutation, run_genetic_algorithm, tournament_selection};
 use crate::utils::Config;
 use ndarray::{Array1, Array2, Axis};
 use polars::frame::DataFrame;
