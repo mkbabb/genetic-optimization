@@ -226,7 +226,7 @@ pub fn run_genetic_algorithm(
     let ga_config = &config.genetic_algorithm;
 
     // Calculate the effective population that needs processing after accounting for top parents
-    let effective_pop_size = (ga_config.pop_size - ga_config.num_top_parents).max(1);
+    let effective_pop_size = (ga_config.pop_size - ga_config.num_elites).max(1);
 
     let num_cpus = num_cpus::get().max(1); // Number of logical CPUs
 
@@ -304,7 +304,7 @@ pub fn run_genetic_algorithm(
         population = Arc::new(
             fitness_ixs
                 .iter()
-                .take(ga_config.num_top_parents)
+                .take(ga_config.num_elites)
                 .map(|(i, _)| population[*i].clone())
                 .chain(
                     (0..num_chunks)

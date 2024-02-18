@@ -188,7 +188,7 @@ def run_genetic_algorithm(
         [list, list], np.ndarray
     ] = roulette_wheel_selection,
     num_parents: int = 2,
-    num_top_parents: int = 5,
+    num_elites: int = 5,
     writer: Optional[Callable[[np.ndarray, float], None]] = None,
 ) -> Optional[np.ndarray]:
 
@@ -209,9 +209,9 @@ def run_genetic_algorithm(
     for n in range(generations):
         fitnesses = [fitness_func(X, costs, discounts) for X in population]
 
-        # Sort population based on fitness and keep the top num_top_parents
+        # Sort population based on fitness and keep the top num_elites
         indices = np.argsort(fitnesses)[::-1]  # Sort in descending order
-        top_parents = [population[ix] for ix in indices[:num_top_parents]]
+        top_parents = [population[ix] for ix in indices[:num_elites]]
 
         new_population = top_parents.copy()
         for _ in range(

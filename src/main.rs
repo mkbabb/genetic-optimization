@@ -2,10 +2,11 @@ pub mod genetic;
 pub mod utils;
 
 use crate::genetic::{
-    gaussian_mutation, k_point_crossover, mutation, rank_selection, run_genetic_algorithm,
-    tournament_selection,
+    bit_flip_mutation, gaussian_mutation, k_point_crossover, mutation, rank_selection,
+    roulette_wheel_selection, run_genetic_algorithm, tournament_selection, uniform_crossover,
+    uniform_mutation,
 };
-use crate::utils::{round, Config};
+use crate::utils::{round, Config, MatingMethod, MutationMethod, SelectionMethod};
 use ndarray::{Array1, Array2, Axis};
 use polars::frame::DataFrame;
 use polars::io::csv::{CsvReader, CsvWriter};
@@ -175,22 +176,44 @@ fn main() {
     let fitness_func: FitnessFunction =
         Arc::new(move |solution, _| calculate_fitness(solution, &costs, &discounts));
 
-    let selection_method_func: SelectionMethodFunction = Arc::new(|population, fitnesses, _| {
-        // let n = 3;
-        // tournament_selection(population, fitnesses, n)
+    let selection_method = config.genetic_algorithm.selection_method.clone();
+    let selection_method_func: SelectionMethodFunction =
+        Arc::new(move |population, fitnesses, _| match selection_method {
+            SelectionMethod::Rank => rank_selection(population, fitnesses),
+            SelectionMethod::Roulette => roulette_wheel_selection(population, fitnesses),
+            SelectionMethod::Tournament => {
+                let n = 3;
+                tournament_selection(population, fitnesses, n)
+            }
+            SelectionMethod::StochasticUniversalSampling => {
+                unimplemented!()
+            }
+        });
 
-        rank_selection(population, fitnesses)
+    let mating_method = config.genetic_algorithm.mating_method.clone();
+    let mating_func: MatingFunction = Arc::new(move |parents, config| match mating_method {
+        MatingMethod::KPointCrossover => k_point_crossover(parents, config.k),
+        MatingMethod::UniformCrossover => uniform_crossover(parents),
     });
 
-    let mating_func: MatingFunction =
-        Arc::new(|parents, config| k_point_crossover(parents, config.k));
-
-    let mutation_func: MutationFunction = Arc::new(|x, config| {
-        // mutation(x, config.mutation_rate);
-
-        let mean = 0.0;
-        let std_dev = 0.1;
-        gaussian_mutation(x, config.mutation_rate, mean, std_dev);
+    let mutation_method = config.genetic_algorithm.mutation_method.clone();
+    let mutation_func: MutationFunction = Arc::new(move |x, config| {
+        match mutation_method {
+            MutationMethod::Gaussian => gaussian_mutation(
+                x,
+                config.mutation_rate,
+                config.mutation_mean,
+                config.mutation_std_dev,
+            ),
+            MutationMethod::Uniform => uniform_mutation(
+                x,
+                config.mutation_rate,
+                config.mutation_lower_bound,
+                config.mutation_upper_bound,
+            ),
+            MutationMethod::Standard => mutation(x, config.mutation_rate),
+            MutationMethod::BitFlip => bit_flip_mutation(x, config.mutation_rate),
+        }
 
         repair_constraint(x);
     });

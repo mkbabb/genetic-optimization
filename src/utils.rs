@@ -17,15 +17,73 @@ pub struct GoogleConfig {
     pub output_range_name: String,
 }
 
+#[derive(Deserialize, Debug, Clone, Copy)]
+pub enum CullingDirection {
+    #[serde(rename = "forward")]
+    Forward,
+    #[serde(rename = "reverse")]
+    Reverse,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub enum SelectionMethod {
+    #[serde(rename = "rank")]
+    Rank,
+    #[serde(rename = "tournament")]
+    Tournament,
+    #[serde(rename = "roulette")]
+    Roulette,
+    #[serde(rename = "stochastic_universal_sampling")]
+    StochasticUniversalSampling,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub enum MatingMethod {
+    #[serde(rename = "k_point_crossover")]
+    KPointCrossover,
+    #[serde(rename = "uniform_crossover")]
+    UniformCrossover,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+pub enum MutationMethod {
+    #[serde(rename = "gaussian")]
+    Gaussian,
+    #[serde(rename = "uniform")]
+    Uniform,
+    #[serde(rename = "standard")]
+    Standard,
+    #[serde(rename = "bit_flip")]
+    BitFlip,
+}
+
 #[derive(Deserialize, Debug, Clone)]
 pub struct GeneticAlgorithmConfig {
-    pub pop_size: usize,
-    pub k: usize,
-    pub mutation_rate: f64,
     pub generations: usize,
+    pub pop_size: usize,
+
+    pub mutation_rate: f64,
+
+    pub mutation_mean: f64,
+    pub mutation_std_dev: f64,
+
+    pub mutation_lower_bound: f64,
+    pub mutation_upper_bound: f64,
+
     pub num_parents: usize,
-    pub num_top_parents: usize,
-    pub chunk_size: usize,
+
+    pub num_elites: usize,
+
+    pub min_culling_percent: f64,
+    pub max_culling_percent: f64,
+    pub culling_direction: CullingDirection,
+
+    pub selection_method: SelectionMethod,
+
+    pub mating_method: MatingMethod,
+    pub k: usize,
+
+    pub mutation_method: MutationMethod,
 }
 
 pub type Population = Arc<Vec<Array2<f64>>>;
