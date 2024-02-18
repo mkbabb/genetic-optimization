@@ -60,6 +60,7 @@ pub enum MutationMethod {
 #[derive(Deserialize, Debug, Clone)]
 pub struct GeneticAlgorithmConfig {
     pub generations: usize,
+    pub max_no_improvement_generations: usize,
     pub pop_size: usize,
 
     pub mutation_rate: f64,

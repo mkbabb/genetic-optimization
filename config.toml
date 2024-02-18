@@ -5,7 +5,10 @@ output_range_name = "Output"
 
 [genetic_algorithm]
 # The number of generations to run the algorithm; trials
-generations = 100_000_000_000
+generations = 1_000_000_000_000
+
+# The number of no improvments generations before culling the population
+max_no_improvement_generations = 100
 
 # The number of solutions to try in each generation
 # The higher the number, the more likely the algorithm will find the best solution,

@@ -304,7 +304,11 @@ pub fn run_genetic_algorithm(
             no_improvement_counter += 1;
         }
 
-        if no_improvement_counter >= 2_usize.pow(reset_counter.min(MAX_EXPONENT)) {
+        if no_improvement_counter
+            >= 2_usize
+                .pow(reset_counter.min(MAX_EXPONENT))
+                .min(ga_config.max_no_improvement_generations)
+        {
             culling_percent = match ga_config.culling_direction {
                 CullingDirection::Forward => (culling_percent
                     * ga_config.culling_percent_increment)
