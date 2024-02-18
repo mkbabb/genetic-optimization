@@ -81,12 +81,13 @@ The `num_elites` hyperparameter specifies this number.
 
 ### Stagnant Mating Pool Culling
 
-We implement an exponential-backoff culling mechanism to ensure that the mating pool does not become stagnant. If a new best solution is not found within a certain number of generations, `no_improvement_counter`, the mating pool, by some percent, `culling_percent` culled and replaced with the current best solution. Each time the pool is culled, the number of generations before the next culling is doubled, ensuring that the algorithm has more time to explore the solution space before the next culling.
+We implement an exponential-backoff culling mechanism to ensure that the mating pool does not become stagnant. If a new best solution is not found within a certain number of generations, `no_improvement_counter`, the mating pool, by some percent, `culling_percent` culled and replaced with the current best solution. Each time the pool is culled, the number of generations before the next culling is multiplicatively increase by `culling_percent_increment`.
 
-The `culling_percent` parameter is modified by the `max_culling_percent` , `min_culling_percent`, and `culling_direction` hyperparameters:
+The `culling_percent` parameter is modified by the `max_culling_percent` , `min_culling_percent`, `culling_direction`, and `culling_percent_increment` hyperparameters:
 
 -   `max_culling_percent` and `min_culling_percent`: Specifies the maximum and minimum culling percentages, respectively.
 -   `culling_direction`: Specifies the strategy at which to either increase or decrease the `culling_percent`.
+-   `culling_percent_increment`: Specifies the amount by which to, multiplicativley, increase or decrease the `culling_percent` at each culling.
 
 ## Implementation Details
 

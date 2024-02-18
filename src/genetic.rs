@@ -225,20 +225,15 @@ pub fn run_genetic_algorithm(
 ) -> Option<Array2<f64>> {
     let ga_config = &config.genetic_algorithm;
 
-    // Calculate the effective population that needs processing after accounting for top parents
     let effective_pop_size = (ga_config.pop_size - ga_config.num_elites).max(1);
-
-    let num_cpus = num_cpus::get().max(1); // Number of logical CPUs
-
-    // Calculate default chunk size, aiming for at least 4 chunks per CPU for balanced workload
-    // and ensure at least 1 individual per chunk to avoid creating empty chunks
+    let num_cpus = num_cpus::get().max(1);
     let default_chunk_size = (ga_config.pop_size / num_cpus).max(1);
-
     let num_chunks = ((effective_pop_size + default_chunk_size - 1) / default_chunk_size).max(1);
 
     let mut best_solution = population[0].clone();
     let mut best_fitness = fitness_func(&best_solution, ga_config);
 
+    let mut culling_percent = ga_config.min_culling_percent;
     let mut no_improvement_counter = 0;
     let mut reset_counter = 0;
 
@@ -254,12 +249,29 @@ pub fn run_genetic_algorithm(
                 .collect();
 
             let mut child = mating_func(&parents, ga_config);
+
             mutation_func(&mut child, ga_config);
 
             local_population.push(child);
         }
 
         local_population
+    };
+
+    let cull_population = |population: &Population,
+                           culling_percent: f64,
+                           best_solution: &Array2<f64>,
+                           best_ix: usize| {
+        let num_to_cull = (ga_config.pop_size as f64 * culling_percent).ceil() as usize;
+        let mut new_population = Vec::with_capacity(ga_config.pop_size);
+
+        new_population.extend((0..num_to_cull).map(|_| best_solution.clone()));
+        new_population
+            .extend((0..(ga_config.pop_size - num_to_cull)).map(|_| population[best_ix].clone()));
+
+        new_population.shuffle(&mut rand::thread_rng());
+
+        new_population
     };
 
     for gen in 0..ga_config.generations {
@@ -269,13 +281,12 @@ pub fn run_genetic_algorithm(
                 .map(|x| fitness_func(x, ga_config))
                 .collect::<Vec<_>>(),
         );
-
         let mut fitness_ixs = fitnesses.iter().enumerate().collect::<Vec<_>>();
         fitness_ixs.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
 
         let best_ix = fitness_ixs[0].0;
-
         let t_best_fitness = fitnesses[best_ix];
+
         println!("Generation {} best fitness: {}", gen, t_best_fitness);
 
         if t_best_fitness > best_fitness {
@@ -284,21 +295,40 @@ pub fn run_genetic_algorithm(
 
             println!("**New best fitness: {}", best_fitness);
 
+            culling_percent = ga_config.min_culling_percent;
             no_improvement_counter = 0;
             reset_counter = 0;
 
-            writer(&best_solution, best_fitness, config);
+            writer(&best_solution, best_fitness, config)
         } else if gen > 0 {
             no_improvement_counter += 1;
         }
 
         if no_improvement_counter >= 2_usize.pow(reset_counter.min(MAX_EXPONENT)) {
-            println!("Resetting population due to stagnation");
+            culling_percent = match ga_config.culling_direction {
+                CullingDirection::Forward => (culling_percent
+                    * ga_config.culling_percent_increment)
+                    .min(ga_config.max_culling_percent),
+                CullingDirection::Reverse => (culling_percent
+                    / ga_config.culling_percent_increment)
+                    .max(ga_config.min_culling_percent),
+            };
 
-            population = Arc::new(vec![best_solution.clone(); ga_config.pop_size]);
+            println!(
+                "Resetting {}% of the population ({}) due to stagnation",
+                (culling_percent * 100.0).round(),
+                (culling_percent * ga_config.pop_size as f64) as usize
+            );
 
             no_improvement_counter = 0;
             reset_counter += 1;
+
+            population = Arc::new(cull_population(
+                &population,
+                culling_percent,
+                &best_solution,
+                best_ix,
+            ));
         }
 
         population = Arc::new(

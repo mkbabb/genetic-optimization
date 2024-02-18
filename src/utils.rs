@@ -63,19 +63,22 @@ pub struct GeneticAlgorithmConfig {
     pub pop_size: usize,
 
     pub mutation_rate: f64,
-
+    
     pub mutation_mean: f64,
     pub mutation_std_dev: f64,
-
+    
     pub mutation_lower_bound: f64,
     pub mutation_upper_bound: f64,
-
+    
+    pub mutation_method: MutationMethod,
+    
     pub num_parents: usize,
 
     pub num_elites: usize,
 
     pub min_culling_percent: f64,
     pub max_culling_percent: f64,
+    pub culling_percent_increment: f64,
     pub culling_direction: CullingDirection,
 
     pub selection_method: SelectionMethod,
@@ -83,7 +86,6 @@ pub struct GeneticAlgorithmConfig {
     pub mating_method: MatingMethod,
     pub k: usize,
 
-    pub mutation_method: MutationMethod,
 }
 
 pub type Population = Arc<Vec<Array2<f64>>>;
