@@ -220,7 +220,7 @@ pub fn run_genetic_algorithm(
             reset_counter = 0;
 
             writer(&best_solution, best_fitness, config);
-        } else {
+        } else if gen > 0 {
             no_improvement_counter += 1;
         }
 

@@ -4,9 +4,9 @@ input_range_name = "Output"
 output_range_name = "Output"
 
 [genetic_algorithm]
-pop_size = 1000
+pop_size = 100
 k = 10
-mutation_rate = 0.015
+mutation_rate = 0.01
 generations = 10000000
-num_parents = 10
-num_top_parents = 10
+num_parents = 2
+num_top_parents = 2
