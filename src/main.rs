@@ -2,9 +2,10 @@ pub mod genetic;
 pub mod utils;
 
 use crate::genetic::{
-    gaussian_mutation, k_point_crossover, mutation, rank_selection, run_genetic_algorithm, tournament_selection
+    gaussian_mutation, k_point_crossover, mutation, rank_selection, run_genetic_algorithm,
+    tournament_selection,
 };
-use crate::utils::Config;
+use crate::utils::{round, Config};
 use ndarray::{Array1, Array2, Axis};
 use polars::frame::DataFrame;
 use polars::io::csv::{CsvReader, CsvWriter};
@@ -55,18 +56,28 @@ pub fn initialize_population_from_solution(
 
 fn calculate_fitness(x: &Array2<f64>, costs: &Array1<f64>, discounts: &Array1<f64>) -> f64 {
     let total_costs_per_bucket = x.t().dot(costs);
+    // println!("total_costs_per_bucket: {:?}", total_costs_per_bucket);
+
     let total_discounts_per_bucket = x.t().dot(discounts);
+    // println!(
+    //     "total_discounts_per_bucket: {:?}",
+    //     total_discounts_per_bucket
+    // );
 
     let items_per_bucket: Array1<f64> = x.t().sum_axis(Axis(1));
+    // println!("items_per_bucket: {:?}", items_per_bucket);
 
-    let avg_discounts_per_bucket = (total_discounts_per_bucket / items_per_bucket).mapv(
-        // round to 2 decimal places
-        |x| (x * 100.0).round() / 100.0,
-    );
+    let avg_discounts_per_bucket =
+        (total_discounts_per_bucket / items_per_bucket).mapv(|x| round(x, 2, 3));
+    // println!("avg_discounts_per_bucket: {:?}", avg_discounts_per_bucket);
 
     let discount_costs_per_bucket = total_costs_per_bucket * avg_discounts_per_bucket;
+    // println!("discount_costs_per_bucket: {:?}", discount_costs_per_bucket);
 
-    discount_costs_per_bucket.sum()
+    let discount_cost_sum = discount_costs_per_bucket.sum();
+    // println!("discount_cost_sum: {:?}", discount_cost_sum);
+
+    discount_cost_sum
 }
 
 pub fn repair_constraint(x: &mut Array2<f64>) {
@@ -77,7 +88,7 @@ pub fn repair_constraint(x: &mut Array2<f64>) {
         .for_each(|mut row| {
             let mut ixs = row
                 .indexed_iter()
-                .filter(|&(_, &v)| v > 0.0)
+                .filter(|&(_, &v)| v != 0.0)
                 .map(|(idx, _)| idx)
                 .collect::<Vec<_>>();
 
@@ -155,8 +166,11 @@ fn main() {
         .n_unique()
         .unwrap();
 
-    let population =
-        Arc::new(initialize_population_from_solution(&df, buckets, config.genetic_algorithm.pop_size));
+    let population = Arc::new(initialize_population_from_solution(
+        &df,
+        buckets,
+        config.genetic_algorithm.pop_size,
+    ));
 
     let fitness_func: FitnessFunction =
         Arc::new(move |solution, _| calculate_fitness(solution, &costs, &discounts));

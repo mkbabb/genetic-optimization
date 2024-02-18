@@ -79,3 +79,21 @@ pub fn upload_csv_to_sheet(output_file_path: &Path, config: &Config) {
 
     run_poetry_command(script_path, &args);
 }
+
+pub fn round(x: f64, num_digits: i32, num_9s: usize) -> f64 {
+    let multiplier = 10_f64.powi(num_digits);
+    let threshold = 0.5 - 0.1_f64.powi(num_9s as i32);
+    let scaled = x * multiplier;
+    let fraction = scaled.fract();
+    let integer = scaled.trunc();
+
+    let rounded = if fraction >= threshold && fraction < 0.5 {
+        integer + 0.5
+    } else if fraction > 0.5 && fraction <= (0.5 + 0.1_f64.powi(num_9s as i32)) {
+        integer + 1.0
+    } else {
+        scaled
+    };
+
+    rounded.round() / multiplier
+}

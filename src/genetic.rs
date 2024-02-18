@@ -232,19 +232,19 @@ pub fn run_genetic_algorithm(
 
     // Calculate default chunk size, aiming for at least 4 chunks per CPU for balanced workload
     // and ensure at least 1 individual per chunk to avoid creating empty chunks
-    let default_chunk_size = (ga_config.pop_size / (ga_config.chunk_size * num_cpus)).max(1);
+    let default_chunk_size = (ga_config.pop_size / num_cpus).max(1);
 
     let num_chunks = ((effective_pop_size + default_chunk_size - 1) / default_chunk_size).max(1);
 
     let mut best_solution = population[0].clone();
-    let mut best_fitness = 0.0;
+    let mut best_fitness = fitness_func(&best_solution, ga_config);
 
     let mut no_improvement_counter = 0;
     let mut reset_counter = 0;
 
     let mate = |chunk_ix: usize, population: &Population, fitnesses: &[f64]| {
         let start_ix = chunk_ix * default_chunk_size;
-        let end_ix = std::cmp::min(start_ix + default_chunk_size, ga_config.pop_size);
+        let end_ix = std::cmp::min(start_ix + default_chunk_size, effective_pop_size);
 
         let mut local_population = Vec::with_capacity(end_ix - start_ix);
 
@@ -254,8 +254,8 @@ pub fn run_genetic_algorithm(
                 .collect();
 
             let mut child = mating_func(&parents, ga_config);
-
             mutation_func(&mut child, ga_config);
+
             local_population.push(child);
         }
 
