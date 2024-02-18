@@ -287,13 +287,13 @@ pub fn run_genetic_algorithm(
         let best_ix = fitness_ixs[0].0;
         let t_best_fitness = fitnesses[best_ix];
 
-        println!("Generation {} best fitness: {}", gen, t_best_fitness);
+        println!("Generation {} best fitness: {:.4}", gen, t_best_fitness);
 
         if t_best_fitness > best_fitness {
             best_solution = population[best_ix].clone();
             best_fitness = t_best_fitness;
 
-            println!("**New best fitness: {}", best_fitness);
+            println!("**New best fitness: {:.4}", best_fitness);
 
             culling_percent = ga_config.min_culling_percent;
             no_improvement_counter = 0;
