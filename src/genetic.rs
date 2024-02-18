@@ -87,6 +87,37 @@ pub fn mutation(x: &mut Array2<f64>, mutation_rate: f64) {
     });
 }
 
+pub fn bit_flip_mutation(x: &mut Array2<f64>, mutation_rate: f64) {
+    let mut rng = rand::thread_rng();
+    let (n_rows, n_cols) = x.dim();
+
+    for i in 0..n_rows {
+        for j in 0..n_cols {
+            if rng.gen::<f64>() < mutation_rate {
+                x[[i, j]] = if x[[i, j]] == 1.0 { 0.0 } else { 1.0 };
+            }
+        }
+    }
+}
+
+pub fn uniform_mutation(
+    x: &mut Array2<f64>,
+    mutation_rate: f64,
+    lower_bound: f64,
+    upper_bound: f64,
+) {
+    let mut rng = rand::thread_rng();
+    let n_cols = x.ncols();
+
+    x.axis_iter_mut(Axis(0)).for_each(|mut row| {
+        for j in 0..n_cols {
+            if rng.gen::<f64>() < mutation_rate {
+                row[j] = rng.gen_range(lower_bound..upper_bound);
+            }
+        }
+    });
+}
+
 pub fn gaussian_mutation(x: &mut Array2<f64>, mutation_rate: f64, mean: f64, std_dev: f64) {
     let n_cols = x.ncols();
     let normal_dist = Normal::new(mean, std_dev).unwrap();
@@ -216,6 +247,8 @@ pub fn run_genetic_algorithm(
             best_solution = population[best_ix].clone();
             best_fitness = t_best_fitness;
 
+            println!("**New best fitness: {}", best_fitness);
+
             no_improvement_counter = 0;
             reset_counter = 0;
 
@@ -225,7 +258,7 @@ pub fn run_genetic_algorithm(
         }
 
         if no_improvement_counter >= 2_usize.pow(reset_counter.min(MAX_EXPONENT)) {
-            println!("Resetting population to previous best solution due to stagnation.");
+            println!("Resetting population due to stagnation");
 
             population = vec![best_solution.clone(); ga_config.pop_size];
 
@@ -250,6 +283,8 @@ pub fn run_genetic_algorithm(
 
             new_population.push(child);
         }
+
+        new_population.shuffle(&mut rand::thread_rng());
 
         population = new_population;
     }

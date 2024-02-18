@@ -1,7 +1,9 @@
 pub mod genetic;
 pub mod utils;
 
-use crate::genetic::{k_point_crossover, mutation, run_genetic_algorithm, tournament_selection};
+use crate::genetic::{
+    gaussian_mutation, k_point_crossover, mutation, rank_selection, run_genetic_algorithm, tournament_selection
+};
 use crate::utils::Config;
 use ndarray::{Array1, Array2, Axis};
 use polars::frame::DataFrame;
@@ -71,20 +73,22 @@ pub fn repair_constraint(x: &mut Array2<f64>) {
     let mut rng = rand::thread_rng();
 
     x.axis_iter_mut(Axis(0))
-        .filter(|row| row.sum() > 1.0)
+        .filter(|row| row.sum() != 1.0)
         .for_each(|mut row| {
             let mut ixs = row
                 .indexed_iter()
                 .filter(|&(_, &v)| v > 0.0)
                 .map(|(idx, _)| idx)
-                .skip(1)
                 .collect::<Vec<_>>();
 
             ixs.shuffle(&mut rng);
 
-            for &ix in ixs.iter() {
+            // set the first to 1, rest to 0
+            row[ixs[0]] = 1.0;
+
+            ixs.iter().skip(1).for_each(|&ix| {
                 row[ix] = 0.0;
-            }
+            });
         });
 }
 
@@ -158,15 +162,22 @@ fn main() {
         Arc::new(move |solution, _| calculate_fitness(solution, &costs, &discounts));
 
     let selection_method_func: SelectionMethodFunction = Arc::new(|population, fitnesses, _| {
-        let n = 3;
-        tournament_selection(population, fitnesses, n)
+        // let n = 3;
+        // tournament_selection(population, fitnesses, n)
+
+        rank_selection(population, fitnesses)
     });
 
     let mating_func: MatingFunction =
         Arc::new(|parents, config| k_point_crossover(parents, config.k));
 
     let mutation_func: MutationFunction = Arc::new(|x, config| {
-        mutation(x, config.mutation_rate);
+        // mutation(x, config.mutation_rate);
+
+        let mean = 0.0;
+        let std_dev = 0.1;
+        gaussian_mutation(x, config.mutation_rate, mean, std_dev);
+
         repair_constraint(x);
     });
 
