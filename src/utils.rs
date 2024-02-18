@@ -25,9 +25,10 @@ pub struct GeneticAlgorithmConfig {
     pub generations: usize,
     pub num_parents: usize,
     pub num_top_parents: usize,
+    pub chunk_size: usize,
 }
 
-pub type Population = Vec<Array2<f64>>;
+pub type Population = Arc<Vec<Array2<f64>>>;
 
 pub type FitnessFunction = Arc<dyn Fn(&Array2<f64>, &GeneticAlgorithmConfig) -> f64 + Send + Sync>;
 pub type SelectionMethodFunction =

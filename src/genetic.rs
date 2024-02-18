@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::utils::*;
 use ndarray::{s, Array2, Axis};
 use ndarray_rand::rand_distr::Normal;
@@ -223,17 +225,50 @@ pub fn run_genetic_algorithm(
 ) -> Option<Array2<f64>> {
     let ga_config = &config.genetic_algorithm;
 
+    // Calculate the effective population that needs processing after accounting for top parents
+    let effective_pop_size = (ga_config.pop_size - ga_config.num_top_parents).max(1);
+
+    let num_cpus = num_cpus::get().max(1); // Number of logical CPUs
+
+    // Calculate default chunk size, aiming for at least 4 chunks per CPU for balanced workload
+    // and ensure at least 1 individual per chunk to avoid creating empty chunks
+    let default_chunk_size = (ga_config.pop_size / (ga_config.chunk_size * num_cpus)).max(1);
+
+    let num_chunks = ((effective_pop_size + default_chunk_size - 1) / default_chunk_size).max(1);
+
     let mut best_solution = population[0].clone();
     let mut best_fitness = 0.0;
 
     let mut no_improvement_counter = 0;
     let mut reset_counter = 0;
 
+    let mate = |chunk_ix: usize, population: &Population, fitnesses: &[f64]| {
+        let start_ix = chunk_ix * default_chunk_size;
+        let end_ix = std::cmp::min(start_ix + default_chunk_size, ga_config.pop_size);
+
+        let mut local_population = Vec::with_capacity(end_ix - start_ix);
+
+        for _ in start_ix..end_ix {
+            let parents: Vec<_> = (0..ga_config.num_parents)
+                .map(|_| selection_method_func(population, fitnesses, ga_config))
+                .collect();
+
+            let mut child = mating_func(&parents, ga_config);
+
+            mutation_func(&mut child, ga_config);
+            local_population.push(child);
+        }
+
+        local_population
+    };
+
     for gen in 0..ga_config.generations {
-        let fitnesses: Vec<_> = population
-            .par_iter()
-            .map(|x| fitness_func(x, ga_config))
-            .collect();
+        let fitnesses = Arc::new(
+            population
+                .par_iter()
+                .map(|x| fitness_func(x, ga_config))
+                .collect::<Vec<_>>(),
+        );
 
         let mut fitness_ixs = fitnesses.iter().enumerate().collect::<Vec<_>>();
         fitness_ixs.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
@@ -260,33 +295,26 @@ pub fn run_genetic_algorithm(
         if no_improvement_counter >= 2_usize.pow(reset_counter.min(MAX_EXPONENT)) {
             println!("Resetting population due to stagnation");
 
-            population = vec![best_solution.clone(); ga_config.pop_size];
+            population = Arc::new(vec![best_solution.clone(); ga_config.pop_size]);
 
             no_improvement_counter = 0;
             reset_counter += 1;
         }
 
-        let mut new_population: Vec<Array2<f64>> = fitness_ixs
-            .iter()
-            .take(ga_config.num_top_parents)
-            .map(|(i, _)| population[*i].clone())
-            .collect();
-
-        while new_population.len() < ga_config.pop_size {
-            let parents: Vec<_> = (0..ga_config.num_parents)
-                .map(|_| selection_method_func(&population, &fitnesses, ga_config))
-                .collect();
-
-            let mut child = mating_func(&parents, ga_config);
-
-            mutation_func(&mut child, ga_config);
-
-            new_population.push(child);
-        }
-
-        new_population.shuffle(&mut rand::thread_rng());
-
-        population = new_population;
+        population = Arc::new(
+            fitness_ixs
+                .iter()
+                .take(ga_config.num_top_parents)
+                .map(|(i, _)| population[*i].clone())
+                .chain(
+                    (0..num_chunks)
+                        .into_par_iter()
+                        .map(|chunk_index| mate(chunk_index, &population, &fitnesses))
+                        .flatten()
+                        .collect::<Vec<_>>(),
+                )
+                .collect(),
+        );
     }
 
     Some(best_solution)

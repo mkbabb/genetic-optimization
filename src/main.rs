@@ -156,7 +156,7 @@ fn main() {
         .unwrap();
 
     let population =
-        initialize_population_from_solution(&df, buckets, config.genetic_algorithm.pop_size);
+        Arc::new(initialize_population_from_solution(&df, buckets, config.genetic_algorithm.pop_size));
 
     let fitness_func: FitnessFunction =
         Arc::new(move |solution, _| calculate_fitness(solution, &costs, &discounts));
