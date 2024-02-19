@@ -13,12 +13,12 @@ max_no_improvement_generations = 2000
 # The number of solutions to try in each generation
 # The higher the number, the more likely the algorithm will find the best solution,
 # but the longer it will take to run
-pop_size = 1000
+pop_size = 2000
 
 # The probability of a gene being mutated by the mutation scheme chosen
 # Most numbers between 0.01 and 0.1 are reasonable; else, the muation rate is too high or too low
 # and the algorithm will not converge to a good solution
-mutation_rate = 0.01
+mutation_rate = 0.0125
 
 # The mean and standard deviation of the Gaussian distribution used to mutate the genes
 mutation_mean = 0
@@ -32,7 +32,7 @@ mutation_upper_bound = 1
 mutation_method = "gaussian"
 
 # The number of solutions to interleave and mate to form a child
-num_parents = 4
+num_parents = 2
 
 # Elitism: the number of solutions to keep from the previous generation
 num_elites = 10
@@ -49,9 +49,9 @@ culling_direction = "forward"
 
 # The function used to select the parents for mating
 # This can be: "rank", "tournament", "roulette"
-selection_method = "tournament"
+selection_method = "rank"
 # The tournament size for the tournament selection method
-tournament_size = 3
+tournament_size = 10
 
 # The function used to interleave the parents' chromosomes to form the children's chromosomes
 # This can be: "k_point_crossover", "uniform_crossover"
