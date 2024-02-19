@@ -42,13 +42,9 @@ pub fn initialize_population_from_solution(
         .map(|_| {
             let mut x = Array2::<f64>::zeros((df.height(), buckets));
 
-            for (i, bucket_value) in bucket_series.into_iter().enumerate() {
-                if let Some(bucket) = bucket_value {
-                    let bucket_index = (bucket - 1) as usize; // assuming 1-indexed buckets
-                    if bucket_index < buckets {
-                        x[(i, bucket_index)] = 1.0;
-                    }
-                }
+            for (i, bucket) in bucket_series.into_no_null_iter().enumerate() {
+                let bucket = (bucket - 1) as usize; // assuming 1-indexed buckets
+                x[(i, bucket)] = 1.0;
             }
             x
         })
