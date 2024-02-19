@@ -181,10 +181,11 @@ fn main() {
         Arc::new(move |population, fitnesses, _| match selection_method {
             SelectionMethod::Rank => rank_selection(population, fitnesses),
             SelectionMethod::Roulette => roulette_wheel_selection(population, fitnesses),
-            SelectionMethod::Tournament => {
-                let n = 3;
-                tournament_selection(population, fitnesses, n)
-            }
+            SelectionMethod::Tournament => tournament_selection(
+                population,
+                fitnesses,
+                config.genetic_algorithm.tournament_size,
+            ),
             SelectionMethod::StochasticUniversalSampling => {
                 unimplemented!()
             }

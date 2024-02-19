@@ -128,6 +128,7 @@ pub fn gaussian_mutation(x: &mut Array2<f64>, mutation_rate: f64, mean: f64, std
     x.axis_iter_mut(Axis(0)).for_each(|mut row| {
         for j in 0..n_cols {
             if rng.gen::<f64>() < mutation_rate {
+
                 let noise = normal_dist.sample(&mut rng);
                 row[j] += noise;
             }
@@ -153,10 +154,12 @@ pub fn tournament_selection(
 }
 
 pub fn roulette_wheel_selection(population: &[Array2<f64>], fitnesses: &[f64]) -> Array2<f64> {
+    let mut rng = rand::thread_rng();
+    
     let total_fitness: f64 = fitnesses.iter().sum();
     let probabilities: Vec<f64> = fitnesses.iter().map(|&f| f / total_fitness).collect();
-    let mut rng = rand::thread_rng();
     let mut cumulative_probabilities = vec![0.0; probabilities.len()];
+    
     probabilities
         .iter()
         .enumerate()

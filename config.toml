@@ -8,7 +8,7 @@ output_range_name = "Output"
 generations = 1_000_000_000_000
 
 # The number of no improvments generations before culling the population
-max_no_improvement_generations = 100
+max_no_improvement_generations = 2000
 
 # The number of solutions to try in each generation
 # The higher the number, the more likely the algorithm will find the best solution,
@@ -32,10 +32,10 @@ mutation_upper_bound = 1
 mutation_method = "gaussian"
 
 # The number of solutions to interleave and mate to form a child
-num_parents = 2
+num_parents = 4
 
 # Elitism: the number of solutions to keep from the previous generation
-num_elites = 2
+num_elites = 10
 
 # The maximum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
 max_culling_percent = 0.99
@@ -49,7 +49,9 @@ culling_direction = "forward"
 
 # The function used to select the parents for mating
 # This can be: "rank", "tournament", "roulette"
-selection_method = "rank"
+selection_method = "tournament"
+# The tournament size for the tournament selection method
+tournament_size = 3
 
 # The function used to interleave the parents' chromosomes to form the children's chromosomes
 # This can be: "k_point_crossover", "uniform_crossover"

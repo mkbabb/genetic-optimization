@@ -83,6 +83,7 @@ pub struct GeneticAlgorithmConfig {
     pub culling_direction: CullingDirection,
 
     pub selection_method: SelectionMethod,
+    pub tournament_size: usize,
 
     pub mating_method: MatingMethod,
     pub k: usize,
