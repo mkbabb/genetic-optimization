@@ -8,6 +8,7 @@ use crate::genetic::{
 use crate::utils::{round, Config, MatingMethod, MutationMethod, SelectionMethod};
 
 use env_logger::Builder;
+use log::{LevelFilter, Record};
 use ndarray::{Array1, Array2, Axis};
 use polars::frame::DataFrame;
 use polars::io::csv::{CsvReader, CsvWriter};
@@ -26,19 +27,14 @@ use utils::{
     MatingFunction, MutationFunction, SelectionMethodFunction, WriterFunction,
 };
 
-use clap::Parser;
+use clap::{arg, command, Parser};
 
 /// Simple program to greet a person
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// Name of the person to greet
-    #[arg(short, long)]
-    name: String,
-
-    /// Number of times to greet
-    #[arg(short, long, default_value_t = 1)]
-    count: u8,
+    #[arg(short, long, default_value = "config.toml")]
+    config: PathBuf,
 }
 
 pub fn initialize_population_from_solution(
@@ -139,16 +135,43 @@ fn main() {
     let input_file_path = NamedTempFile::new().unwrap().into_temp_path().to_path_buf();
     let output_file_path = NamedTempFile::new().unwrap().into_temp_path().to_path_buf();
 
+    let args: Args = Args::parse();
+
     Builder::new()
-        .format(|buf, record| writeln!(buf, "{}: {}", record.level(), record.args()))
-        .filter(None, log::LevelFilter::Debug) // Set the global log level filter
-        .target(env_logger::Target::Stdout) // Set target to stdout
+        .format(|buf, record: &Record| {
+            let target = record.target();
+            let level = record.level();
+            let message = record.args();
+            let thread = std::thread::current();
+            let thread_name = thread.name().unwrap_or("unknown");
+
+            if let Some(file) = record.file() {
+                if let Some(line) = record.line() {
+                    writeln!(
+                        buf,
+                        "[{}] {} - {}:{} - {} - {}",
+                        level, target, file, line, thread_name, message
+                    )
+                } else {
+                    writeln!(
+                        buf,
+                        "[{}] {} - {} - {}",
+                        level, target, thread_name, message
+                    )
+                }
+            } else {
+                writeln!(
+                    buf,
+                    "[{}] {} - {} - {}",
+                    level, target, thread_name, message
+                )
+            }
+        })
+        .filter(None, LevelFilter::Debug)
+        .target(env_logger::Target::Stdout)
         .init();
 
-    let config_file_path: PathBuf =
-        arg!(-c --config <CONFIG> "Provides an input config file to the program").into();
-
-    let config_str = fs::read_to_string(config_file_path).expect("Failed to read config file");
+    let config_str = fs::read_to_string(args.config).expect("Failed to read config file");
     let config: Config = toml::from_str(&config_str).expect("Failed to parse config");
 
     log::info!("{:#?}", config);
