@@ -268,14 +268,14 @@ config = tomllib.loads(
     config_path.read_text(),
 )
 
-optimization_sheet_id = config["google"]["optimization_sheet_id"]
+sheet_id = config["google"]["sheet_id"]
 input_range_name = config["google"]["input_range_name"]
 output_range_name = config["google"]["output_range_name"]
 
 
 df = sheets.to_frame(
     sheets.values(
-        spreadsheet_id=optimization_sheet_id,
+        spreadsheet_id=sheet_id,
         range_name=input_range_name,
     )
 )
@@ -290,7 +290,7 @@ def write_to_google_sheet(X: np.ndarray, fitness: float) -> None:
     output_df["bucket"] = bucket_assignments
 
     sheets.batch_update(
-        spreadsheet_id=optimization_sheet_id,
+        spreadsheet_id=sheet_id,
         data={
             output_range_name: sheets.from_frame(output_df),
         },

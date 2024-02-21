@@ -200,7 +200,7 @@ pub fn run_genetic_algorithm(
     let ga_config = &config.genetic_algorithm;
 
     let effective_pop_size = (ga_config.pop_size - ga_config.num_elites).max(1);
-    let num_cpus = num_cpus::get().max(1);
+    let num_cpus = ga_config.num_cpus.unwrap_or_else(num_cpus::get);
     let default_chunk_size = (ga_config.pop_size / num_cpus).max(1);
     let num_chunks = ((effective_pop_size + default_chunk_size - 1) / default_chunk_size).max(1);
 

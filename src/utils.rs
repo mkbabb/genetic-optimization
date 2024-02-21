@@ -12,7 +12,7 @@ pub struct Config {
 
 #[derive(Deserialize, Debug, Clone)]
 pub struct GoogleConfig {
-    pub optimization_sheet_id: String,
+    pub sheet_id: String,
     pub input_range_name: String,
     pub output_range_name: String,
 }
@@ -64,15 +64,15 @@ pub struct GeneticAlgorithmConfig {
     pub pop_size: usize,
 
     pub mutation_rate: f64,
-    
+
     pub mutation_mean: f64,
     pub mutation_std_dev: f64,
-    
+
     pub mutation_lower_bound: f64,
     pub mutation_upper_bound: f64,
-    
+
     pub mutation_method: MutationMethod,
-    
+
     pub num_parents: usize,
 
     pub num_elites: usize,
@@ -88,6 +88,7 @@ pub struct GeneticAlgorithmConfig {
     pub mating_method: MatingMethod,
     pub k: usize,
 
+    pub num_cpus: Option<usize>,
 }
 
 pub type Population = Arc<Vec<Array2<f64>>>;
@@ -125,7 +126,7 @@ pub fn download_sheet_to_csv(input_file_path: &Path, config: &Config) {
     let script_path = Path::new("scripts.download_sheet_to_csv");
     let args = [
         input_file_path.to_str().unwrap(),
-        &config.google.optimization_sheet_id,
+        &config.google.sheet_id,
         &config.google.input_range_name,
     ];
     run_poetry_command(script_path, &args);
@@ -135,7 +136,7 @@ pub fn upload_csv_to_sheet(output_file_path: &Path, config: &Config) {
     let script_path = Path::new("scripts.upload_csv_to_sheet");
     let args = [
         output_file_path.to_str().unwrap(),
-        &config.google.optimization_sheet_id,
+        &config.google.sheet_id,
         &config.google.output_range_name,
     ];
 

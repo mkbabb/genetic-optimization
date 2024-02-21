@@ -19,6 +19,7 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
+use tempfile::NamedTempFile;
 use utils::{
     download_sheet_to_csv, upload_csv_to_sheet, FitnessFunction, GeneticAlgorithmConfig,
     MatingFunction, MutationFunction, SelectionMethodFunction, WriterFunction,
@@ -69,16 +70,20 @@ fn initialize_population_random(
 }
 
 fn calculate_fitness(x: &Array2<f64>, costs: &Array1<f64>, discounts: &Array1<f64>) -> f64 {
-    let total_costs_per_bucket = x.t().dot(costs);
+    let xt = x.t();
+
+    let total_costs_per_bucket = xt.dot(costs);
     // log::debug!("total_costs_per_bucket: {:?}", total_costs_per_bucket);
 
-    let total_discounts_per_bucket = x.t().dot(discounts);
+    let total_discounts_per_bucket = xt.dot(discounts);
     // log::debug!(
     //     "total_discounts_per_bucket: {:?}",
     //     total_discounts_per_bucket
     // );
 
-    let items_per_bucket: Array1<f64> = x.t().sum_axis(Axis(1));
+    let items_per_bucket: Array1<f64> = xt
+        .sum_axis(Axis(1))
+        .mapv(|x| if x == 0.0 { 1.0 } else { x });
     // log::debug!("items_per_bucket: {:?}", items_per_bucket);
 
     let avg_discounts_per_bucket =
@@ -90,7 +95,6 @@ fn calculate_fitness(x: &Array2<f64>, costs: &Array1<f64>, discounts: &Array1<f6
 
     let discount_cost_sum = discount_costs_per_bucket.sum();
     // log::debug!("discount_cost_sum: {:?}", discount_cost_sum);
-
     discount_cost_sum
 }
 
@@ -122,15 +126,15 @@ fn main() {
         .target(env_logger::Target::Stdout) // Set target to stdout
         .init();
 
-    let input_file_path = Path::new("./data/input.csv");
-    let output_file_path = Path::new("./data/output.csv");
+    let input_file_path = NamedTempFile::new().unwrap().into_temp_path().to_path_buf();
+    let output_file_path = NamedTempFile::new().unwrap().into_temp_path().to_path_buf();
 
     let config_str = fs::read_to_string("./config.toml").expect("Failed to read config file");
     let config: Config = toml::from_str(&config_str).expect("Failed to parse config");
 
     log::info!("{:#?}", config);
 
-    download_sheet_to_csv(input_file_path, &config);
+    download_sheet_to_csv(&input_file_path, &config);
 
     let df = CsvReader::from_path(input_file_path)
         .expect("Failed to read CSV file. Make sure the file exists and the path is correct.")
@@ -168,11 +172,6 @@ fn main() {
         buckets,
         config.genetic_algorithm.pop_size,
     ));
-
-    // print out the population pretty:
-    for x in population.iter() {
-        println!("{:?}", x);
-    }
 
     let fitness_func: FitnessFunction =
         Arc::new(move |solution, _| calculate_fitness(solution, &costs, &discounts));
@@ -222,8 +221,8 @@ fn main() {
     let config_clone = config.clone();
 
     let writer_func: WriterFunction = Arc::new(move |solution, fitness, _| {
-        write_solution_to_csv(output_file_path, solution, fitness, &df);
-        upload_csv_to_sheet(output_file_path, &config);
+        write_solution_to_csv(&output_file_path, solution, fitness, &df);
+        upload_csv_to_sheet(&output_file_path, &config);
     });
 
     run_genetic_algorithm(
