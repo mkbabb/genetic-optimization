@@ -1,5 +1,4 @@
 [google]
-# sheet_id = "https://docs.google.com/spreadsheets/d/1DdZmbo3tvtrb8fNfgTdgmOpjX-XoKhTcQa1hQLlffPE/edit#gid=769220148"
 sheet_id = "https://docs.google.com/spreadsheets/d/1v5sCwN-d_Lr2T2pTpr8OtSND8dlh7Q5hfk-KXFKoLOc/edit#gid=1798594710"
 input_range_name = "Output"
 output_range_name = "Output"

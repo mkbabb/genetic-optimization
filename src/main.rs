@@ -6,6 +6,7 @@ use crate::genetic::{
     run_genetic_algorithm, tournament_selection, uniform_crossover,
 };
 use crate::utils::{round, Config, MatingMethod, MutationMethod, SelectionMethod};
+
 use env_logger::Builder;
 use ndarray::{Array1, Array2, Axis};
 use polars::frame::DataFrame;
@@ -17,13 +18,28 @@ use std::cmp;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::NamedTempFile;
 use utils::{
     download_sheet_to_csv, upload_csv_to_sheet, FitnessFunction, GeneticAlgorithmConfig,
     MatingFunction, MutationFunction, SelectionMethodFunction, WriterFunction,
 };
+
+use clap::Parser;
+
+/// Simple program to greet a person
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Name of the person to greet
+    #[arg(short, long)]
+    name: String,
+
+    /// Number of times to greet
+    #[arg(short, long, default_value_t = 1)]
+    count: u8,
+}
 
 pub fn initialize_population_from_solution(
     df: &DataFrame,
@@ -120,16 +136,19 @@ fn write_solution_to_csv(file_path: &Path, solution: &Array2<f64>, _: f64, df: &
 }
 
 fn main() {
+    let input_file_path = NamedTempFile::new().unwrap().into_temp_path().to_path_buf();
+    let output_file_path = NamedTempFile::new().unwrap().into_temp_path().to_path_buf();
+
     Builder::new()
         .format(|buf, record| writeln!(buf, "{}: {}", record.level(), record.args()))
         .filter(None, log::LevelFilter::Debug) // Set the global log level filter
         .target(env_logger::Target::Stdout) // Set target to stdout
         .init();
 
-    let input_file_path = NamedTempFile::new().unwrap().into_temp_path().to_path_buf();
-    let output_file_path = NamedTempFile::new().unwrap().into_temp_path().to_path_buf();
+    let config_file_path: PathBuf =
+        arg!(-c --config <CONFIG> "Provides an input config file to the program").into();
 
-    let config_str = fs::read_to_string("./config.toml").expect("Failed to read config file");
+    let config_str = fs::read_to_string(config_file_path).expect("Failed to read config file");
     let config: Config = toml::from_str(&config_str).expect("Failed to parse config");
 
     log::info!("{:#?}", config);
