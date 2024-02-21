@@ -2,8 +2,8 @@ pub mod genetic;
 pub mod utils;
 
 use crate::genetic::{
-    gaussian_mutation, k_point_crossover, mutation, rank_selection, roulette_wheel_selection,
-    run_genetic_algorithm, tournament_selection, uniform_crossover,
+    gaussian_mutation, k_point_crossover, rank_selection, roulette_wheel_selection, run,
+    standard_mutation, tournament_selection, uniform_crossover,
 };
 use crate::utils::{init_logger, round, Config, MatingMethod, MutationMethod, SelectionMethod};
 
@@ -218,7 +218,7 @@ fn main() {
             //     config.mutation_lower_bound,
             //     config.mutation_upper_bound,
             // ),
-            MutationMethod::Standard => mutation(x, config.mutation_rate),
+            MutationMethod::Standard => standard_mutation(x, config.mutation_rate),
             // MutationMethod::BitFlip => bit_flip_mutation(x, config.mutation_rate),
             _ => unimplemented!(),
         }
@@ -231,7 +231,7 @@ fn main() {
         upload_csv_to_sheet(&output_file_path, &config);
     });
 
-    run_genetic_algorithm(
+    run(
         population,
         &config_clone,
         fitness_func,

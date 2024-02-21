@@ -192,6 +192,42 @@ pub fn upload_csv_to_sheet(output_file_path: &Path, config: &Config) {
     run_poetry_command(script_path, &args);
 }
 
+/// Rounds a floating-point number to a specified number of digits, with an adjustable rounding threshold.
+///
+/// This function allows for more nuanced control over the rounding process compared to the standard `.round()`
+/// method, by permitting the specification of a threshold for rounding up based on a sequence of nines.
+///
+/// # Arguments
+///
+/// * `x` - The floating-point number to round.
+/// * `num_digits` - The number of digits to round to.
+/// * `num_9s` - The number of consecutive nines (`9`) that define the upper rounding threshold. This effectively
+///   determines how "aggressive" the rounding should be. A higher value results in a narrower range where numbers
+///   are rounded up.
+///
+/// # Examples
+///
+/// Basic rounding without adjusting the threshold:
+///
+/// ```
+/// let result = round(3.14159, 2, 0); // Rounds to 3.14
+/// ```
+///
+/// Rounding with an adjusted threshold:
+///
+/// ```
+/// let result = round(3.14159, 2, 1); // Might round to 3.15 if within threshold
+/// ```
+///
+/// # Returns
+///
+/// The rounded floating-point number.
+///
+/// # Note
+///
+/// The function's behavior is unique for values where the fractional part is close to `.5`. The `num_9s` argument
+/// adjusts the threshold for when values are rounded up or down, allowing for finer control over rounding decisions
+/// near half-integer values.
 pub fn round(x: f64, num_digits: i32, num_9s: usize) -> f64 {
     let multiplier = 10_f64.powi(num_digits);
     let threshold = 0.5 - 0.1_f64.powi(num_9s as i32);

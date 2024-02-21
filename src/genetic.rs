@@ -72,7 +72,7 @@ pub fn uniform_crossover(parents: &[Array2<f64>]) -> Array2<f64> {
     child
 }
 
-pub fn mutation(x: &mut Array2<f64>, mutation_rate: f64) {
+pub fn standard_mutation(x: &mut Array2<f64>, mutation_rate: f64) {
     let mut rng = rand::thread_rng();
     let n_cols = x.ncols();
 
@@ -186,7 +186,7 @@ pub fn rank_selection(population: &[Array2<f64>], fitnesses: &[f64]) -> Array2<f
     population[indexed_fitnesses[selected_index].0].clone()
 }
 
-pub fn run_genetic_algorithm(
+pub fn run(
     mut population: Population,
     config: &Config,
     fitness_func: FitnessFunction,
@@ -230,21 +230,38 @@ pub fn run_genetic_algorithm(
         local_population
     };
 
-    let cull_population = |population: &Population,
-                           culling_percent: f64,
-                           best_solution: &Array2<f64>,
-                           best_ix: usize| {
-        let num_to_cull = (ga_config.pop_size as f64 * culling_percent).ceil() as usize;
-        let mut new_population = Vec::with_capacity(ga_config.pop_size);
+    let cull_population =
+        |population: &Population, culling_percent: f64, best_solution: &Array2<f64>| {
+            let num_to_cull = (population.len() as f64 * culling_percent).ceil() as usize;
 
-        new_population.extend((0..num_to_cull).map(|_| best_solution.clone()));
-        new_population
-            .extend((0..(ga_config.pop_size - num_to_cull)).map(|_| population[best_ix].clone()));
+            let mut new_population = Vec::with_capacity(population.len());
 
-        new_population.shuffle(&mut rand::thread_rng());
+            // Fill the population, up to num_to_cull, with mutants of the best solution
+            new_population.extend((0..num_to_cull).map(|_| {
+                let mut clone = best_solution.clone();
+                mutation_func(&mut clone, ga_config);
+                clone
+            }));
 
-        new_population
-    };
+            // The rest of the population should be filled with a random selection of the population
+            new_population.extend((0..(ga_config.pop_size - num_to_cull)).map(|_| {
+                population
+                    .iter()
+                    .choose(&mut rand::thread_rng())
+                    .unwrap()
+                    .clone()
+            }));
+
+            // Finally, set num_elites members of the new population to be a pure clone
+            // of the best solution
+            new_population[..ga_config.num_elites]
+                .iter_mut()
+                .for_each(|x| *x = best_solution.clone());
+
+            assert_eq!(new_population.len(), ga_config.pop_size);
+
+            new_population
+        };
 
     for gen in 0..ga_config.generations {
         let fitnesses = Arc::new(
@@ -291,9 +308,10 @@ pub fn run_genetic_algorithm(
             };
 
             log::warn!(
-                "Resetting {}% of the population ({}) due to stagnation",
+                "Resetting {}% of the population ({} of {}) due to stagnation",
                 (culling_percent * 100.0).round(),
-                (culling_percent * ga_config.pop_size as f64) as usize
+                (culling_percent * population.len() as f64) as usize,
+                population.len(),
             );
 
             no_improvement_counter = 0;
@@ -303,7 +321,6 @@ pub fn run_genetic_algorithm(
                 &population,
                 culling_percent,
                 &best_solution,
-                best_ix,
             ));
         }
 
