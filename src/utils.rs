@@ -1,5 +1,10 @@
+use chrono::Local;
+use colored::*;
+use env_logger::Builder;
+use log::{Level, LevelFilter, Record};
 use ndarray::Array2;
 use serde::Deserialize;
+use std::io::Write;
 use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
@@ -104,8 +109,52 @@ pub type WriterFunction = Arc<dyn Fn(&Array2<f64>, f64, &Config) + Send + Sync>;
 
 pub const MAX_EXPONENT: u32 = (usize::BITS - 1) / 2 - 1;
 
+pub fn init_logger(log_level: Option<LevelFilter>, target: Option<env_logger::Target>) {
+    Builder::new()
+        .format(|buf, record: &Record| {
+            let target = record.target();
+            let level = record.level();
+            let message = record.args();
+            let thread = std::thread::current();
+            let thread_name = thread.name().unwrap_or("unknown");
+            let time = Local::now().format("%Y-%m-%d %H:%M:%S");
+
+            let level_colored = match level {
+                Level::Error => level.to_string().red(),
+                Level::Warn => level.to_string().yellow(),
+                Level::Info => level.to_string().cyan(),
+                Level::Debug => level.to_string().purple(),
+                Level::Trace => level.to_string().white(),
+            };
+
+            let log_line = if let Some(file) = record.file() {
+                if let Some(line) = record.line() {
+                    format!(
+                        "{} [{}] {} - {}:{} - {} - {}",
+                        time, level_colored, target, file, line, thread_name, message
+                    )
+                } else {
+                    format!(
+                        "{} [{}] {} - {} - {}",
+                        time, level_colored, target, thread_name, message
+                    )
+                }
+            } else {
+                format!(
+                    "{} [{}] {} - {} - {}",
+                    time, level_colored, target, thread_name, message
+                )
+            };
+
+            writeln!(buf, "{}", log_line)
+        })
+        .filter(None, log_level.unwrap_or(LevelFilter::Debug))
+        .target(target.unwrap_or(env_logger::Target::Stdout))
+        .init();
+}
+
 // Helper function to run a Python script with Poetry
-fn run_poetry_command(script_path: &Path, args: &[&str]) {
+pub fn run_poetry_command(script_path: &Path, args: &[&str]) {
     let output = Command::new("poetry")
         .arg("run")
         .arg("python3")

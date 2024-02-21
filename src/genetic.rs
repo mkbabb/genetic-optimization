@@ -1,6 +1,5 @@
-use std::sync::Arc;
-
 use crate::utils::*;
+
 use ndarray::{s, Array2, Axis};
 use ndarray_rand::rand_distr::Normal;
 use rand::{
@@ -9,6 +8,7 @@ use rand::{
     Rng,
 };
 use rayon::prelude::*;
+use std::sync::Arc;
 
 pub fn k_point_crossover(parents: &[Array2<f64>], k: usize) -> Array2<f64> {
     let num_parents = parents.len();
@@ -180,10 +180,8 @@ pub fn rank_selection(population: &[Array2<f64>], fitnesses: &[f64]) -> Array2<f
             break;
         }
     }
-
     // Correct for possible off-by-one due to cumulative probabilities
     selected_index = selected_index.min(population.len() - 1);
-
     // Return the selected individual based on calculated rank
     population[indexed_fitnesses[selected_index].0].clone()
 }
@@ -292,7 +290,7 @@ pub fn run_genetic_algorithm(
                     .max(ga_config.min_culling_percent),
             };
 
-            log::debug!(
+            log::warn!(
                 "Resetting {}% of the population ({}) due to stagnation",
                 (culling_percent * 100.0).round(),
                 (culling_percent * ga_config.pop_size as f64) as usize
