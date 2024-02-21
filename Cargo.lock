@@ -445,27 +445,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
-name = "erate-optimization"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "clap",
- "colored",
- "csv",
- "env_logger",
- "log",
- "ndarray",
- "ndarray-rand",
- "num_cpus",
- "polars",
- "rand",
- "rayon",
- "serde",
- "tempfile",
- "toml",
-]
-
-[[package]]
 name = "errno"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -498,6 +477,27 @@ name = "foreign_vec"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee1b05cbd864bcaecbd3455d6d967862d446e4ebfc3c2e5e5b9841e53cba6673"
+
+[[package]]
+name = "genetic_optimization"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "colored",
+ "csv",
+ "env_logger",
+ "log",
+ "ndarray",
+ "ndarray-rand",
+ "num_cpus",
+ "polars",
+ "rand",
+ "rayon",
+ "serde",
+ "tempfile",
+ "toml",
+]
 
 [[package]]
 name = "getrandom"
