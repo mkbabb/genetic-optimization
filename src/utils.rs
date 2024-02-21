@@ -102,7 +102,7 @@ pub type MutationFunction = Arc<dyn Fn(&mut Array2<f64>, &GeneticAlgorithmConfig
 
 pub type WriterFunction = Arc<dyn Fn(&Array2<f64>, f64, &Config) + Send + Sync>;
 
-pub const MAX_EXPONENT: u32 = (usize::BITS - 1) / 2;
+pub const MAX_EXPONENT: u32 = (usize::BITS - 1) / 2 - 1;
 
 // Helper function to run a Python script with Poetry
 fn run_poetry_command(script_path: &Path, args: &[&str]) {

@@ -19,7 +19,7 @@ pop_size = 2000
 # The probability of a gene being mutated by the mutation scheme chosen
 # Most numbers between 0.01 and 0.1 are reasonable; else, the muation rate is too high or too low
 # and the algorithm will not converge to a good solution
-mutation_rate = 0.0125
+mutation_rate = 0.01
 
 # The mean and standard deviation of the Gaussian distribution used to mutate the genes
 mutation_mean = 0
@@ -33,7 +33,7 @@ mutation_upper_bound = 1
 mutation_method = "gaussian"
 
 # The number of solutions to interleave and mate to form a child
-num_parents = 2
+num_parents = 10
 
 # Elitism: the number of solutions to keep from the previous generation
 num_elites = 10
@@ -60,7 +60,7 @@ mating_method = "k_point_crossover"
 # The k in k-point crossover:
 # The number of points at which the given parents' chromosomes are split and then
 # interleaved to form the children's chromosomes
-k = 3
+k = 6
 
 # The number of CPUs to use to run the algorithm
 # num_cpus = 4

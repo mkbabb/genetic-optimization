@@ -280,7 +280,7 @@ pub fn run_genetic_algorithm(
 
         if no_improvement_counter
             >= 2_usize
-                .pow(reset_counter.min(MAX_EXPONENT))
+                .pow(reset_counter.min(MAX_EXPONENT) + 1)
                 .min(ga_config.max_no_improvement_generations)
         {
             culling_percent = match ga_config.culling_direction {
