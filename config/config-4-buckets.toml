@@ -62,4 +62,4 @@ mating_method = "k_point_crossover"
 k = 6
 
 # The number of CPUs to use to run the algorithm
-# num_cpus = 4
+num_cpus = 64
