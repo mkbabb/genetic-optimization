@@ -77,46 +77,13 @@ pub fn mutation(x: &mut Array2<f64>, mutation_rate: f64) {
     let n_cols = x.ncols();
 
     x.axis_iter_mut(Axis(0)).for_each(|mut row| {
-        for j in 0..n_cols {
-            if rng.gen::<f64>() >= mutation_rate {
-                continue;
-            }
-
-            row[j] = 0.0;
-            let new_col = rng.gen_range(0..n_cols);
-            row[new_col] = 1.0;
+        if rng.gen::<f64>() >= mutation_rate {
+            return;
         }
-    });
-}
 
-pub fn bit_flip_mutation(x: &mut Array2<f64>, mutation_rate: f64) {
-    let mut rng = rand::thread_rng();
-    let (n_rows, n_cols) = x.dim();
-
-    for i in 0..n_rows {
-        for j in 0..n_cols {
-            if rng.gen::<f64>() < mutation_rate {
-                x[[i, j]] = if x[[i, j]] == 1.0 { 0.0 } else { 1.0 };
-            }
-        }
-    }
-}
-
-pub fn uniform_mutation(
-    x: &mut Array2<f64>,
-    mutation_rate: f64,
-    lower_bound: f64,
-    upper_bound: f64,
-) {
-    let mut rng = rand::thread_rng();
-    let n_cols = x.ncols();
-
-    x.axis_iter_mut(Axis(0)).for_each(|mut row| {
-        for j in 0..n_cols {
-            if rng.gen::<f64>() < mutation_rate {
-                row[j] = rng.gen_range(lower_bound..upper_bound);
-            }
-        }
+        let new_col = rng.gen_range(0..n_cols);
+        row.fill(0.0);
+        row[new_col] = 1.0;
     });
 }
 
@@ -126,11 +93,15 @@ pub fn gaussian_mutation(x: &mut Array2<f64>, mutation_rate: f64, mean: f64, std
     let mut rng = rand::thread_rng();
 
     x.axis_iter_mut(Axis(0)).for_each(|mut row| {
-        for j in 0..n_cols {
-            if rng.gen::<f64>() < mutation_rate {
+        if rng.gen::<f64>() >= mutation_rate {
+            return;
+        }
 
-                let noise = normal_dist.sample(&mut rng);
-                row[j] += noise;
+        for i in 0..n_cols {
+            if normal_dist.sample(&mut rng).round() >= 1.0 {
+                row.fill(0.0);
+                row[i] = 1.0;
+                break;
             }
         }
     });
@@ -155,11 +126,11 @@ pub fn tournament_selection(
 
 pub fn roulette_wheel_selection(population: &[Array2<f64>], fitnesses: &[f64]) -> Array2<f64> {
     let mut rng = rand::thread_rng();
-    
+
     let total_fitness: f64 = fitnesses.iter().sum();
     let probabilities: Vec<f64> = fitnesses.iter().map(|&f| f / total_fitness).collect();
     let mut cumulative_probabilities = vec![0.0; probabilities.len()];
-    
+
     probabilities
         .iter()
         .enumerate()
@@ -290,13 +261,13 @@ pub fn run_genetic_algorithm(
         let best_ix = fitness_ixs[0].0;
         let t_best_fitness = fitnesses[best_ix];
 
-        println!("Generation {} best fitness: {:.4}", gen, t_best_fitness);
+        log::debug!("Generation {} best fitness: {:.4}", gen, t_best_fitness);
 
         if t_best_fitness > best_fitness {
             best_solution = population[best_ix].clone();
             best_fitness = t_best_fitness;
 
-            println!("**New best fitness: {:.4}", best_fitness);
+            log::info!("**New best fitness: {:.4}", best_fitness);
 
             culling_percent = ga_config.min_culling_percent;
             no_improvement_counter = 0;
@@ -321,7 +292,7 @@ pub fn run_genetic_algorithm(
                     .max(ga_config.min_culling_percent),
             };
 
-            println!(
+            log::debug!(
                 "Resetting {}% of the population ({}) due to stagnation",
                 (culling_percent * 100.0).round(),
                 (culling_percent * ga_config.pop_size as f64) as usize

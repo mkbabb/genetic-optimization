@@ -114,10 +114,10 @@ fn run_poetry_command(script_path: &Path, args: &[&str]) {
         .output()
         .expect("Failed to execute command");
 
-    println!("{}", String::from_utf8_lossy(&output.stdout));
+    log::debug!("{}", String::from_utf8_lossy(&output.stdout));
 
     if !output.stderr.is_empty() {
-        println!("{}", String::from_utf8_lossy(&output.stderr));
+        log::debug!("{}", String::from_utf8_lossy(&output.stderr));
     }
 }
 

@@ -2,26 +2,26 @@ pub mod genetic;
 pub mod utils;
 
 use crate::genetic::{
-    bit_flip_mutation, gaussian_mutation, k_point_crossover, mutation, rank_selection,
-    roulette_wheel_selection, run_genetic_algorithm, tournament_selection, uniform_crossover,
-    uniform_mutation,
+    gaussian_mutation, k_point_crossover, mutation, rank_selection, roulette_wheel_selection,
+    run_genetic_algorithm, tournament_selection, uniform_crossover,
 };
 use crate::utils::{round, Config, MatingMethod, MutationMethod, SelectionMethod};
+use env_logger::Builder;
 use ndarray::{Array1, Array2, Axis};
 use polars::frame::DataFrame;
 use polars::io::csv::{CsvReader, CsvWriter};
 use polars::io::{SerReader, SerWriter};
 use polars::prelude::*;
 use polars::series::Series;
-use rand::seq::SliceRandom;
 use std::cmp;
 use std::fs;
 use std::fs::File;
+use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 use utils::{
-    download_sheet_to_csv, upload_csv_to_sheet, FitnessFunction, MatingFunction, MutationFunction,
-    SelectionMethodFunction, WriterFunction,
+    download_sheet_to_csv, upload_csv_to_sheet, FitnessFunction, GeneticAlgorithmConfig,
+    MatingFunction, MutationFunction, SelectionMethodFunction, WriterFunction,
 };
 
 pub fn initialize_population_from_solution(
@@ -51,53 +51,47 @@ pub fn initialize_population_from_solution(
         .collect()
 }
 
+fn initialize_population_random(
+    df: &DataFrame,
+    buckets: usize,
+    pop_size: usize,
+    mutation_fn: MutationFunction,
+    config: &GeneticAlgorithmConfig,
+) -> Vec<Array2<f64>> {
+    (0..pop_size)
+        .map(|_| {
+            let mut x = Array2::<f64>::zeros((df.height(), buckets));
+            x.column_mut(0).fill(1.0);
+            mutation_fn(&mut x, config);
+            x
+        })
+        .collect()
+}
+
 fn calculate_fitness(x: &Array2<f64>, costs: &Array1<f64>, discounts: &Array1<f64>) -> f64 {
     let total_costs_per_bucket = x.t().dot(costs);
-    // println!("total_costs_per_bucket: {:?}", total_costs_per_bucket);
+    // log::debug!("total_costs_per_bucket: {:?}", total_costs_per_bucket);
 
     let total_discounts_per_bucket = x.t().dot(discounts);
-    // println!(
+    // log::debug!(
     //     "total_discounts_per_bucket: {:?}",
     //     total_discounts_per_bucket
     // );
 
     let items_per_bucket: Array1<f64> = x.t().sum_axis(Axis(1));
-    // println!("items_per_bucket: {:?}", items_per_bucket);
+    // log::debug!("items_per_bucket: {:?}", items_per_bucket);
 
     let avg_discounts_per_bucket =
         (total_discounts_per_bucket / items_per_bucket).mapv(|x| round(x, 2, 3));
-    // println!("avg_discounts_per_bucket: {:?}", avg_discounts_per_bucket);
+    // log::debug!("avg_discounts_per_bucket: {:?}", avg_discounts_per_bucket);
 
     let discount_costs_per_bucket = total_costs_per_bucket * avg_discounts_per_bucket;
-    // println!("discount_costs_per_bucket: {:?}", discount_costs_per_bucket);
+    // log::debug!("discount_costs_per_bucket: {:?}", discount_costs_per_bucket);
 
     let discount_cost_sum = discount_costs_per_bucket.sum();
-    // println!("discount_cost_sum: {:?}", discount_cost_sum);
+    // log::debug!("discount_cost_sum: {:?}", discount_cost_sum);
 
     discount_cost_sum
-}
-
-pub fn repair_constraint(x: &mut Array2<f64>) {
-    let mut rng = rand::thread_rng();
-
-    x.axis_iter_mut(Axis(0))
-        .filter(|row| row.sum() != 1.0)
-        .for_each(|mut row| {
-            let mut ixs = row
-                .indexed_iter()
-                .filter(|&(_, &v)| v != 0.0)
-                .map(|(idx, _)| idx)
-                .collect::<Vec<_>>();
-
-            ixs.shuffle(&mut rng);
-
-            // set the first to 1, rest to 0
-            row[ixs[0]] = 1.0;
-
-            ixs.iter().skip(1).for_each(|&ix| {
-                row[ix] = 0.0;
-            });
-        });
 }
 
 fn write_solution_to_csv(file_path: &Path, solution: &Array2<f64>, _: f64, df: &DataFrame) {
@@ -122,13 +116,19 @@ fn write_solution_to_csv(file_path: &Path, solution: &Array2<f64>, _: f64, df: &
 }
 
 fn main() {
+    Builder::new()
+        .format(|buf, record| writeln!(buf, "{}: {}", record.level(), record.args()))
+        .filter(None, log::LevelFilter::Debug) // Set the global log level filter
+        .target(env_logger::Target::Stdout) // Set target to stdout
+        .init();
+
     let input_file_path = Path::new("./data/input.csv");
     let output_file_path = Path::new("./data/output.csv");
 
     let config_str = fs::read_to_string("./config.toml").expect("Failed to read config file");
     let config: Config = toml::from_str(&config_str).expect("Failed to parse config");
 
-    dbg!(config.genetic_algorithm.clone());
+    log::info!("{:#?}", config);
 
     download_sheet_to_csv(input_file_path, &config);
 
@@ -169,6 +169,11 @@ fn main() {
         config.genetic_algorithm.pop_size,
     ));
 
+    // print out the population pretty:
+    for x in population.iter() {
+        println!("{:?}", x);
+    }
+
     let fitness_func: FitnessFunction =
         Arc::new(move |solution, _| calculate_fitness(solution, &costs, &discounts));
 
@@ -202,17 +207,16 @@ fn main() {
                 config.mutation_mean,
                 config.mutation_std_dev,
             ),
-            MutationMethod::Uniform => uniform_mutation(
-                x,
-                config.mutation_rate,
-                config.mutation_lower_bound,
-                config.mutation_upper_bound,
-            ),
+            // MutationMethod::Uniform => uniform_mutation(
+            //     x,
+            //     config.mutation_rate,
+            //     config.mutation_lower_bound,
+            //     config.mutation_upper_bound,
+            // ),
             MutationMethod::Standard => mutation(x, config.mutation_rate),
-            MutationMethod::BitFlip => bit_flip_mutation(x, config.mutation_rate),
+            // MutationMethod::BitFlip => bit_flip_mutation(x, config.mutation_rate),
+            _ => unimplemented!(),
         }
-
-        repair_constraint(x);
     });
 
     let config_clone = config.clone();
