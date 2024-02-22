@@ -63,6 +63,16 @@ pub enum MutationMethod {
 }
 
 #[derive(Deserialize, Debug, Clone)]
+pub enum CullingMethod {
+    #[serde(rename = "best_mutants")]
+    BestMutants,
+    #[serde(rename = "best")]
+    Best,
+    #[serde(rename = "random")]
+    Random,
+}
+
+#[derive(Deserialize, Debug, Clone)]
 pub struct GeneticAlgorithmConfig {
     pub generations: usize,
     pub max_no_improvement_generations: usize,
@@ -93,21 +103,41 @@ pub struct GeneticAlgorithmConfig {
     pub mating_method: MatingMethod,
     pub k: usize,
 
+    pub culling_method: CullingMethod,
+
     pub num_cpus: Option<usize>,
 }
 
-pub type Population = Arc<Vec<Array2<f64>>>;
+pub type Chromosome = Array2<f64>;
 
-pub type FitnessFunction = Arc<dyn Fn(&Array2<f64>, &GeneticAlgorithmConfig) -> f64 + Send + Sync>;
+pub type Population = Vec<Chromosome>;
+
+pub type FitnessFunction = Arc<dyn Fn(&Chromosome, &GeneticAlgorithmConfig) -> f64 + Send + Sync>;
+
 pub type SelectionMethodFunction =
-    Arc<dyn Fn(&[Array2<f64>], &[f64], &GeneticAlgorithmConfig) -> Array2<f64> + Send + Sync>;
+    Arc<dyn Fn(&[Chromosome], &[f64], &GeneticAlgorithmConfig) -> Chromosome + Send + Sync>;
+
 pub type MatingFunction =
-    Arc<dyn Fn(&[Array2<f64>], &GeneticAlgorithmConfig) -> Array2<f64> + Send + Sync>;
-pub type MutationFunction = Arc<dyn Fn(&mut Array2<f64>, &GeneticAlgorithmConfig) + Send + Sync>;
+    Arc<dyn Fn(&[Chromosome], &GeneticAlgorithmConfig) -> Chromosome + Send + Sync>;
+
+pub type MutationFunction = Arc<dyn Fn(&mut Chromosome, &GeneticAlgorithmConfig) + Send + Sync>;
+
+pub type CullingFunction = Arc<
+    dyn Fn(&[Chromosome], &Chromosome, f64, &GeneticAlgorithmConfig) -> Population + Send + Sync,
+>;
 
 pub type WriterFunction = Arc<dyn Fn(&Array2<f64>, f64, &Config) + Send + Sync>;
 
-pub const MAX_EXPONENT: u32 = (usize::BITS - 1) / 2 - 1;
+pub struct GeneticAlgorithmFunctions {
+    pub fitness: FitnessFunction,
+    pub selection_method: SelectionMethodFunction,
+    pub mating: MatingFunction,
+    pub mutation: MutationFunction,
+    pub culling: CullingFunction,
+    pub writer: WriterFunction,
+}
+
+pub const MAX_EXPONENT: usize = (usize::BITS as usize - 1) / 2 - 1;
 
 pub fn init_logger(log_level: Option<LevelFilter>, target: Option<env_logger::Target>) {
     Builder::new()

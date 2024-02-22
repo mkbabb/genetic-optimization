@@ -1,5 +1,5 @@
 [google]
-sheet_id = "https://docs.google.com/spreadsheets/d/1v5sCwN-d_Lr2T2pTpr8OtSND8dlh7Q5hfk-KXFKoLOc/edit#gid=1798594710"
+sheet_id = "https://docs.google.com/spreadsheets/d/1RkmbHp7FUflVr33pN7Xq-J0OkBTMBfkoJVgRvqwQL1w/edit#gid=1798594710"
 input_range_name = "Output"
 output_range_name = "Output"
 
@@ -36,6 +36,9 @@ num_parents = 10
 
 # Elitism: the number of solutions to keep from the previous generation
 num_elites = 10
+
+# The function used to cull the population
+culling_method = "best_mutants"
 
 # The maximum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
 max_culling_percent = 0.99

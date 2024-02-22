@@ -2,12 +2,15 @@ pub mod genetic;
 pub mod utils;
 
 use crate::genetic::{
-    gaussian_mutation, k_point_crossover, rank_selection, roulette_wheel_selection, run,
-    standard_mutation, tournament_selection, uniform_crossover,
+    gaussian_mutation, init_ga_funcs, k_point_crossover, rank_selection, roulette_wheel_selection,
+    run, standard_mutation, tournament_selection, uniform_crossover,
 };
-use crate::utils::{init_logger, round, Config, MatingMethod, MutationMethod, SelectionMethod};
+use crate::utils::{
+    init_logger, round, Config, CullingMethod, MatingMethod, MutationMethod, SelectionMethod,
+};
 
 use clap::{arg, command, Parser};
+use genetic_optimization::genetic::cull_population_best_mutants;
 use ndarray::{Array1, Array2, Axis};
 use polars::frame::DataFrame;
 use polars::io::csv::{CsvReader, CsvWriter};
@@ -182,62 +185,12 @@ fn main() {
     let fitness_func: FitnessFunction =
         Arc::new(move |solution, _| calculate_fitness(solution, &costs, &discounts));
 
-    let selection_method = config.genetic_algorithm.selection_method.clone();
-    let selection_method_func: SelectionMethodFunction =
-        Arc::new(move |population, fitnesses, _| match selection_method {
-            SelectionMethod::Rank => rank_selection(population, fitnesses),
-            SelectionMethod::Roulette => roulette_wheel_selection(population, fitnesses),
-            SelectionMethod::Tournament => tournament_selection(
-                population,
-                fitnesses,
-                config.genetic_algorithm.tournament_size,
-            ),
-            SelectionMethod::StochasticUniversalSampling => {
-                unimplemented!()
-            }
-        });
-
-    let mating_method = config.genetic_algorithm.mating_method.clone();
-    let mating_func: MatingFunction = Arc::new(move |parents, config| match mating_method {
-        MatingMethod::KPointCrossover => k_point_crossover(parents, config.k),
-        MatingMethod::UniformCrossover => uniform_crossover(parents),
-    });
-
-    let mutation_method = config.genetic_algorithm.mutation_method.clone();
-    let mutation_func: MutationFunction = Arc::new(move |x, config| {
-        match mutation_method {
-            MutationMethod::Gaussian => gaussian_mutation(
-                x,
-                config.mutation_rate,
-                config.mutation_mean,
-                config.mutation_std_dev,
-            ),
-            // MutationMethod::Uniform => uniform_mutation(
-            //     x,
-            //     config.mutation_rate,
-            //     config.mutation_lower_bound,
-            //     config.mutation_upper_bound,
-            // ),
-            MutationMethod::Standard => standard_mutation(x, config.mutation_rate),
-            // MutationMethod::BitFlip => bit_flip_mutation(x, config.mutation_rate),
-            _ => unimplemented!(),
-        }
-    });
-
-    let config_clone = config.clone();
-
-    let writer_func: WriterFunction = Arc::new(move |solution, fitness, _| {
+    let writer_func: WriterFunction = Arc::new(move |solution, fitness, config| {
         write_solution_to_csv(&output_file_path, solution, fitness, &df);
-        upload_csv_to_sheet(&output_file_path, &config);
+        upload_csv_to_sheet(&output_file_path, config);
     });
 
-    run(
-        population,
-        &config_clone,
-        fitness_func,
-        selection_method_func,
-        mating_func,
-        mutation_func,
-        writer_func,
-    );
+    let funcs = init_ga_funcs(fitness_func, writer_func, &config);
+
+    run(population, &config, &funcs);
 }

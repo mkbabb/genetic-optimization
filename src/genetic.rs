@@ -10,7 +10,7 @@ use rand::{
 use rayon::prelude::*;
 use std::sync::Arc;
 
-pub fn k_point_crossover(parents: &[Array2<f64>], k: usize) -> Array2<f64> {
+pub fn k_point_crossover(parents: &[Chromosome], k: usize) -> Chromosome {
     let num_parents = parents.len();
     assert!(
         num_parents >= 2,
@@ -44,7 +44,7 @@ pub fn k_point_crossover(parents: &[Array2<f64>], k: usize) -> Array2<f64> {
     child
 }
 
-pub fn uniform_crossover(parents: &[Array2<f64>]) -> Array2<f64> {
+pub fn uniform_crossover(parents: &[Chromosome]) -> Chromosome {
     assert!(
         parents.len() >= 2,
         "There must be at least two parents for crossover."
@@ -72,7 +72,7 @@ pub fn uniform_crossover(parents: &[Array2<f64>]) -> Array2<f64> {
     child
 }
 
-pub fn standard_mutation(x: &mut Array2<f64>, mutation_rate: f64) {
+pub fn standard_mutation(x: &mut Chromosome, mutation_rate: f64) {
     let mut rng = rand::thread_rng();
     let n_cols = x.ncols();
 
@@ -87,7 +87,7 @@ pub fn standard_mutation(x: &mut Array2<f64>, mutation_rate: f64) {
     });
 }
 
-pub fn gaussian_mutation(x: &mut Array2<f64>, mutation_rate: f64, mean: f64, std_dev: f64) {
+pub fn gaussian_mutation(x: &mut Chromosome, mutation_rate: f64, mean: f64, std_dev: f64) {
     let n_cols = x.ncols();
     let normal_dist = Normal::new(mean, std_dev).unwrap();
     let mut rng = rand::thread_rng();
@@ -108,10 +108,10 @@ pub fn gaussian_mutation(x: &mut Array2<f64>, mutation_rate: f64, mean: f64, std
 }
 
 pub fn tournament_selection(
-    population: &[Array2<f64>],
+    population: &[Chromosome],
     fitnesses: &[f64],
     tournament_size: usize,
-) -> Array2<f64> {
+) -> Chromosome {
     let mut rng = rand::thread_rng();
 
     let selected_indices: Vec<_> = (0..population.len()).choose_multiple(&mut rng, tournament_size);
@@ -124,7 +124,7 @@ pub fn tournament_selection(
     population[best_index].clone()
 }
 
-pub fn roulette_wheel_selection(population: &[Array2<f64>], fitnesses: &[f64]) -> Array2<f64> {
+pub fn roulette_wheel_selection(population: &[Chromosome], fitnesses: &[f64]) -> Chromosome {
     let mut rng = rand::thread_rng();
 
     let total_fitness: f64 = fitnesses.iter().sum();
@@ -148,7 +148,7 @@ pub fn roulette_wheel_selection(population: &[Array2<f64>], fitnesses: &[f64]) -
     population[selected_index].clone()
 }
 
-pub fn rank_selection(population: &[Array2<f64>], fitnesses: &[f64]) -> Array2<f64> {
+pub fn rank_selection(population: &[Chromosome], fitnesses: &[f64]) -> Chromosome {
     let mut rng = rand::thread_rng();
 
     // Pair each fitness with its index, sort by fitness, then calculate rank-based probabilities.
@@ -186,30 +186,130 @@ pub fn rank_selection(population: &[Array2<f64>], fitnesses: &[f64]) -> Array2<f
     population[indexed_fitnesses[selected_index].0].clone()
 }
 
-pub fn run(
-    mut population: Population,
-    config: &Config,
+pub fn cull_population_best_mutants(
+    population: &[Chromosome],
+    best_solution: &Chromosome,
+    culling_percent: f64,
+) -> Vec<Chromosome> {
+    let num_to_cull = (population.len() as f64 * culling_percent).ceil() as usize;
+
+    let mut new_population = Vec::with_capacity(population.len());
+
+    // Fill the population, up to num_to_cull, with mutants of the best solution
+    new_population.extend((0..num_to_cull).map(|_| {
+        let mut clone = best_solution.clone();
+        standard_mutation(&mut clone, 1.0);
+        clone
+    }));
+
+    // The rest of the population should be filled with a random selection of the population
+    new_population.extend(
+        (0..(population.len() - num_to_cull))
+            .map(|_| population.choose(&mut rand::thread_rng()).unwrap().clone()),
+    );
+
+    assert_eq!(new_population.len(), population.len());
+
+    new_population
+}
+
+pub fn init_ga_funcs(
     fitness_func: FitnessFunction,
-    selection_method_func: SelectionMethodFunction,
-    mating_func: MatingFunction,
-    mutation_func: MutationFunction,
-    writer: WriterFunction,
-) -> Option<Array2<f64>> {
+    writer_func: WriterFunction,
+    _: &Config,
+) -> GeneticAlgorithmFunctions {
+    let selection_method_func: SelectionMethodFunction = Arc::new(
+        move |population, fitnesses, config| match config.selection_method {
+            SelectionMethod::Rank => rank_selection(population, fitnesses),
+            SelectionMethod::Roulette => roulette_wheel_selection(population, fitnesses),
+            SelectionMethod::Tournament => {
+                tournament_selection(population, fitnesses, config.tournament_size)
+            }
+            SelectionMethod::StochasticUniversalSampling => {
+                unimplemented!()
+            }
+        },
+    );
+
+    let mating_func: MatingFunction = Arc::new(|parents, config| match config.mating_method {
+        MatingMethod::KPointCrossover => k_point_crossover(parents, config.k),
+        MatingMethod::UniformCrossover => uniform_crossover(parents),
+    });
+
+    let mutation_func: MutationFunction = Arc::new(|x, config| match config.mutation_method {
+        MutationMethod::Gaussian => gaussian_mutation(
+            x,
+            config.mutation_rate,
+            config.mutation_mean,
+            config.mutation_std_dev,
+        ),
+        MutationMethod::Standard => standard_mutation(x, config.mutation_rate),
+        _ => unimplemented!(),
+    });
+
+    let culling_func = Arc::new(
+        |population: &_, best_solution: &_, culling_percent: _, config: &GeneticAlgorithmConfig| {
+            match config.culling_method {
+                CullingMethod::BestMutants => {
+                    cull_population_best_mutants(population, best_solution, culling_percent)
+                }
+                CullingMethod::Best => {
+                    unimplemented!()
+                }
+                CullingMethod::Random => {
+                    unimplemented!()
+                }
+            }
+        },
+    );
+
+    GeneticAlgorithmFunctions {
+        fitness: fitness_func,
+        selection_method: selection_method_func,
+        mating: mating_func,
+        mutation: mutation_func,
+        culling: culling_func,
+        writer: writer_func,
+    }
+}
+
+pub fn run(
+    mut population: Arc<Population>,
+    config: &Config,
+    funcs: &GeneticAlgorithmFunctions,
+) -> Option<Chromosome> {
     let ga_config = &config.genetic_algorithm;
+
+    let GeneticAlgorithmFunctions {
+        fitness: fitness_func,
+        selection_method: selection_method_func,
+        mating: mating_func,
+        mutation: mutation_func,
+        culling: culling_func,
+        writer: writer_func,
+    } = funcs;
 
     let effective_pop_size = (ga_config.pop_size - ga_config.num_elites).max(1);
     let num_cpus = ga_config.num_cpus.unwrap_or_else(num_cpus::get);
     let default_chunk_size = (ga_config.pop_size / num_cpus).max(1);
     let num_chunks = ((effective_pop_size + default_chunk_size - 1) / default_chunk_size).max(1);
 
+    // Initialize the best solution and its fitness
     let mut best_solution = population[0].clone();
     let mut best_fitness = fitness_func(&best_solution, ga_config);
 
+    // Initialize the culling percentage and counters
     let mut culling_percent = ga_config.min_culling_percent;
-    let mut no_improvement_counter = 0;
-    let mut reset_counter = 0;
+    let mut no_improvement_counter = 0_usize;
+    let mut reset_counter = 0_usize;
 
-    let mate = |chunk_ix: usize, population: &Population, fitnesses: &[f64]| {
+    let was_no_improvement = |no_improvement_counter: usize, reset_counter: usize| {
+        let backoff = 2_usize.pow((reset_counter.min(MAX_EXPONENT) + 1) as u32);
+
+        backoff.min(ga_config.max_no_improvement_generations) <= no_improvement_counter
+    };
+
+    let par_mate = |chunk_ix: usize, population: &[Chromosome], fitnesses: &[f64]| {
         let start_ix = chunk_ix * default_chunk_size;
         let end_ix = std::cmp::min(start_ix + default_chunk_size, effective_pop_size);
 
@@ -230,38 +330,16 @@ pub fn run(
         local_population
     };
 
-    let cull_population =
-        |population: &Population, culling_percent: f64, best_solution: &Array2<f64>| {
-            let num_to_cull = (population.len() as f64 * culling_percent).ceil() as usize;
+    let get_elites = |population: &[Chromosome], fitnesses: &[f64]| {
+        let mut fitness_ixs = fitnesses.iter().enumerate().collect::<Vec<_>>();
+        fitness_ixs.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
 
-            let mut new_population = Vec::with_capacity(population.len());
-
-            // Fill the population, up to num_to_cull, with mutants of the best solution
-            new_population.extend((0..num_to_cull).map(|_| {
-                let mut clone = best_solution.clone();
-                mutation_func(&mut clone, ga_config);
-                clone
-            }));
-
-            // The rest of the population should be filled with a random selection of the population
-            new_population.extend((0..(ga_config.pop_size - num_to_cull)).map(|_| {
-                population
-                    .iter()
-                    .choose(&mut rand::thread_rng())
-                    .unwrap()
-                    .clone()
-            }));
-
-            // Finally, set num_elites members of the new population to be a pure clone
-            // of the best solution
-            new_population[..ga_config.num_elites]
-                .iter_mut()
-                .for_each(|x| *x = best_solution.clone());
-
-            assert_eq!(new_population.len(), ga_config.pop_size);
-
-            new_population
-        };
+        fitness_ixs
+            .iter()
+            .take(ga_config.num_elites)
+            .map(|(i, _)| population[*i].clone())
+            .collect::<Vec<_>>()
+    };
 
     for gen in 0..ga_config.generations {
         let fitnesses = Arc::new(
@@ -270,6 +348,7 @@ pub fn run(
                 .map(|x| fitness_func(x, ga_config))
                 .collect::<Vec<_>>(),
         );
+
         let mut fitness_ixs = fitnesses.iter().enumerate().collect::<Vec<_>>();
         fitness_ixs.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
 
@@ -288,16 +367,12 @@ pub fn run(
             no_improvement_counter = 0;
             reset_counter = 0;
 
-            writer(&best_solution, best_fitness, config)
+            writer_func(&best_solution, best_fitness, config)
         } else if gen > 0 {
             no_improvement_counter += 1;
         }
 
-        if no_improvement_counter
-            >= 2_usize
-                .pow(reset_counter.min(MAX_EXPONENT) + 1)
-                .min(ga_config.max_no_improvement_generations)
-        {
+        if was_no_improvement(no_improvement_counter, reset_counter) {
             culling_percent = match ga_config.culling_direction {
                 CullingDirection::Forward => (culling_percent
                     * ga_config.culling_percent_increment)
@@ -308,31 +383,38 @@ pub fn run(
             };
 
             log::warn!(
-                "Resetting {}% of the population ({} of {}) due to stagnation",
+                "Resetting {}% of the population ({} of {}) due to stagnation; reset counter: {}",
                 (culling_percent * 100.0).round(),
                 (culling_percent * population.len() as f64) as usize,
                 population.len(),
+                reset_counter,
             );
 
             no_improvement_counter = 0;
             reset_counter += 1;
 
-            population = Arc::new(cull_population(
-                &population,
-                culling_percent,
-                &best_solution,
-            ));
+            let culled_population =
+                culling_func(&population, &best_solution, culling_percent, ga_config)
+                    .into_iter()
+                    .take(effective_pop_size);
+
+            population = Arc::new(
+                get_elites(&population, &fitnesses)
+                    .into_iter()
+                    .chain(culled_population)
+                    .collect(),
+            );
+
+            assert_eq!(population.len(), ga_config.pop_size);
         }
 
         population = Arc::new(
-            fitness_ixs
-                .iter()
-                .take(ga_config.num_elites)
-                .map(|(i, _)| population[*i].clone())
+            get_elites(&population, &fitnesses)
+                .into_iter()
                 .chain(
                     (0..num_chunks)
                         .into_par_iter()
-                        .map(|chunk_index| mate(chunk_index, &population, &fitnesses))
+                        .map(|chunk_index| par_mate(chunk_index, &population, &fitnesses))
                         .flatten()
                         .collect::<Vec<_>>(),
                 )
