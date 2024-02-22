@@ -8,20 +8,18 @@ The genetic algorithm is composed of several modular functions, each of which pe
 
 ### `fitness_func`; Fitness Function
 
-The fitness function evaluates how well a given solution performs. As input, it takes only the chromosome and must return some measure of its fitness.
+The fitness function evaluates how well a given chromosome performs. As input, it takes only the chromosome and must return some measure of its fitness by way of float, `f64`.
 
 This function is user-defined and specific to a given problem. For our case, it calculates the aggregate `discount-cost` for a partitioning.
 
 ### `selection_func`; Selection
-
-Various selection methods are implemented:
 
 -   **Tournament Selection**: Randomly selects a subset of chromosomes from the population and chooses the best one based on their fitness values.
 -   **Roulette Wheel Selection**: Assigns a probability to each chromosome based on its fitness, and then selects parents based on these probabilities.
 -   **Rank Selection**: Assigns a probability to each chromosome based on its rank in the population, and then selects parents based on these probabilities.
 -   **Stochastic Universal Sampling**: Similar to roulette wheel selection, but selects multiple parents at once, ensuring that the selected parents are spread out across the population.
 
-This process is repeated to select multiple parents for the crossover operation.
+This process is repeated to select multiple, `n`, parents for the crossover operation.
 
 ### `mating_func`; Crossover; Mating
 
@@ -32,10 +30,8 @@ Various crossover, or mating, methods are implemented:
 
 ### `mutation_func`; Mutation
 
--   **Standard Mutation**: With a certain probability, the mutation operation introduces random changes to offspring, promoting genetic diversity within the population. This helps prevent premature convergence to suboptimal solutions.
+-   **Standard Mutation**: With a certain probability, randomly changes the value of genes in the chromosome.
 -   **Gaussian Mutation**: Adds a small amount of Gaussian noise to the offspring, allowing for more fine-grained exploration of the solution space.
--   **Bit-Flip Mutation**: Randomly flips bits in the chromosome, introducing small changes to the offspring.
--   **Uniform Mutation**: Randomly changes the value of genes in the chromosome with a certain probability.
 
 ### `culling_func`; Stagnant Mating Pool Culling
 
@@ -53,7 +49,7 @@ The percent whereof to cull is modified by the `max_culling_percent` , `min_cull
 
 -   **Random Culling**: The culled population is filled with a totally randomized set of chromosomes.
 -   **Best**: The culled population is filled with the best chromosomes from the current population.
-- **Best Mutants**: Defined below.
+-   **Best Mutants**: Defined below.
 
 ##### Best Mutants
 
@@ -62,7 +58,6 @@ A newly culled population is constructed as follows:
 -   A selection of clones of the best solution are added to the culled population, but mutated by 1%.
 -   The remaining slots are filled with a random subset of the current population.
 -   Finally, `num_elites` of the pure best solution are set to the front of the culled population array.
-
 
 ### `writer_func`, Writing the Result
 
@@ -92,11 +87,12 @@ A series of Python shims are used to facilitate the interfacing of the Rust libr
 
 ## Usage Scenario
 
-A typical usage scenario for a genetic algorithm involves the following steps:
+A typical usage scenario befitting of a genetic algorithm involves the following steps:
 
--   First, the user defines the fitness function, which evaluates the quality of a given solution matrix, `X`.
--   Next, the user configures the genetic algorithm by specifying the population size, the number of generations, the selection, crossover, and mutation methods, and other hyperparameters.
--   The user then provides the initial population of candidate solutions, which can be randomly generated or based on some heuristic or prior knowledge.
+-   First, define a fitness function, which evaluates the quality of a given solution matrix, or chromosome, `X`.
+-   Next, configure the population size, the number of generations, the selection, crossover, culling, and mutation methods, as well as other [hyperparameters](config.toml).
+
+-   Provide the initial population of candidate solutions, which can be randomly generated or based on some heuristic or prior knowledge.
 -   The genetic algorithm iteratively evolves the population, applying selection, crossover, mutation, and constraint handling operations to produce new generations of candidate solutions.
 
 ## E-Rate School Partitioning
