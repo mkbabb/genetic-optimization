@@ -186,29 +186,85 @@ pub fn rank_selection(population: &[Chromosome], fitnesses: &[f64]) -> Chromosom
     population[indexed_fitnesses[selected_index].0].clone()
 }
 
-pub fn cull_population_best_mutants(
+pub fn cull_best_mutants(
     population: &[Chromosome],
     best_solution: &Chromosome,
-    culling_percent: f64,
+    num_to_cull: usize,
 ) -> Vec<Chromosome> {
-    let num_to_cull = (population.len() as f64 * culling_percent).ceil() as usize;
-
     let mut new_population = Vec::with_capacity(population.len());
 
-    // Fill the population, up to num_to_cull, with mutants of the best solution
     new_population.extend((0..num_to_cull).map(|_| {
         let mut clone = best_solution.clone();
         standard_mutation(&mut clone, 1.0);
         clone
     }));
 
-    // The rest of the population should be filled with a random selection of the population
     new_population.extend(
         (0..(population.len() - num_to_cull))
             .map(|_| population.choose(&mut rand::thread_rng()).unwrap().clone()),
     );
 
-    assert_eq!(new_population.len(), population.len());
+    new_population
+}
+
+pub fn cull_best_mutants_randomized(
+    population: &[Chromosome],
+    best_solution: &Chromosome,
+    num_to_cull: usize,
+) -> Vec<Chromosome> {
+    let mut new_population = Vec::with_capacity(population.len());
+
+    // Half should be best mutants, half should be random
+    new_population.extend((0..num_to_cull).map(|i| {
+        let mutation_rate = if i < num_to_cull / 2 { 1.0 } else { 100.0 };
+
+        let mut clone = best_solution.clone();
+        standard_mutation(&mut clone, mutation_rate);
+        clone
+    }));
+
+    new_population.extend(
+        (0..(population.len() - num_to_cull))
+            .map(|_| population.choose(&mut rand::thread_rng()).unwrap().clone()),
+    );
+
+    new_population
+}
+
+pub fn cull_randomized(
+    population: &[Chromosome],
+    _: &Chromosome,
+    num_to_cull: usize,
+) -> Vec<Chromosome> {
+    let mut new_population = Vec::with_capacity(population.len());
+
+    new_population.extend((0..num_to_cull).map(|i| {
+        let mut clone = population[i].clone();
+        standard_mutation(&mut clone, 100.0);
+        clone
+    }));
+
+    new_population.extend(
+        (0..(population.len() - num_to_cull))
+            .map(|_| population.choose(&mut rand::thread_rng()).unwrap().clone()),
+    );
+
+    new_population
+}
+
+pub fn cull_best(
+    population: &[Chromosome],
+    best_solution: &Chromosome,
+    num_to_cull: usize,
+) -> Vec<Chromosome> {
+    let mut new_population = Vec::with_capacity(population.len());
+
+    new_population.extend((0..num_to_cull).map(|_| best_solution.clone()));
+
+    new_population.extend(
+        (0..(population.len() - num_to_cull))
+            .map(|_| population.choose(&mut rand::thread_rng()).unwrap().clone()),
+    );
 
     new_population
 }
@@ -248,17 +304,16 @@ pub fn init_ga_funcs(
     });
 
     let culling_func = Arc::new(
-        |population: &_, best_solution: &_, culling_percent: _, config: &GeneticAlgorithmConfig| {
+        |population: &_, best_solution: &_, num_to_cull: _, config: &GeneticAlgorithmConfig| {
             match config.culling_method {
                 CullingMethod::BestMutants => {
-                    cull_population_best_mutants(population, best_solution, culling_percent)
+                    cull_best_mutants(population, best_solution, num_to_cull)
                 }
-                CullingMethod::Best => {
-                    unimplemented!()
+                CullingMethod::BestMutantsRandom => {
+                    cull_best_mutants_randomized(population, best_solution, num_to_cull)
                 }
-                CullingMethod::Random => {
-                    unimplemented!()
-                }
+                CullingMethod::Best => cull_best(population, best_solution, num_to_cull),
+                CullingMethod::Random => cull_randomized(population, best_solution, num_to_cull),
             }
         },
     );
@@ -382,10 +437,12 @@ pub fn run(
                     .max(ga_config.min_culling_percent),
             };
 
+            let num_to_cull = (population.len() as f64 * culling_percent).ceil() as usize;
+
             log::warn!(
                 "Resetting {}% of the population ({} of {}) due to stagnation; reset counter: {}",
                 (culling_percent * 100.0).round(),
-                (culling_percent * population.len() as f64) as usize,
+                num_to_cull,
                 population.len(),
                 reset_counter,
             );
@@ -394,7 +451,7 @@ pub fn run(
             reset_counter += 1;
 
             let culled_population =
-                culling_func(&population, &best_solution, culling_percent, ga_config)
+                culling_func(&population, &best_solution, num_to_cull, ga_config)
                     .into_iter()
                     .take(effective_pop_size);
 

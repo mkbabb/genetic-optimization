@@ -10,7 +10,7 @@ use crate::utils::{
 };
 
 use clap::{arg, command, Parser};
-use genetic_optimization::genetic::cull_population_best_mutants;
+use genetic_optimization::genetic::cull_best_mutants;
 use ndarray::{Array1, Array2, Axis};
 use polars::frame::DataFrame;
 use polars::io::csv::{CsvReader, CsvWriter};

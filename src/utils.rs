@@ -66,6 +66,8 @@ pub enum MutationMethod {
 pub enum CullingMethod {
     #[serde(rename = "best_mutants")]
     BestMutants,
+    #[serde(rename = "best_mutants_random")]
+    BestMutantsRandom,
     #[serde(rename = "best")]
     Best,
     #[serde(rename = "random")]
@@ -123,7 +125,7 @@ pub type MatingFunction =
 pub type MutationFunction = Arc<dyn Fn(&mut Chromosome, &GeneticAlgorithmConfig) + Send + Sync>;
 
 pub type CullingFunction = Arc<
-    dyn Fn(&[Chromosome], &Chromosome, f64, &GeneticAlgorithmConfig) -> Population + Send + Sync,
+    dyn Fn(&[Chromosome], &Chromosome, usize, &GeneticAlgorithmConfig) -> Population + Send + Sync,
 >;
 
 pub type WriterFunction = Arc<dyn Fn(&Array2<f64>, f64, &Config) + Send + Sync>;
