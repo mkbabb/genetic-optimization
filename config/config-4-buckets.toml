@@ -13,12 +13,12 @@ max_no_improvement_generations = 1000
 # The number of solutions to try in each generation
 # The higher the number, the more likely the algorithm will find the best solution,
 # but the longer it will take to run
-pop_size = 500
+pop_size = 2000
 
 # The probability of a gene being mutated by the mutation scheme chosen
 # Most numbers between 0.01 and 0.1 are reasonable; else, the muation rate is too high or too low
 # and the algorithm will not converge to a good solution
-mutation_rate = 0.01
+mutation_rate = 0.015
 
 # The mean and standard deviation of the Gaussian distribution used to mutate the genes
 mutation_mean = 0
@@ -41,7 +41,7 @@ num_elites = 10
 culling_method = "best_mutants_random"
 
 # The maximum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
-max_culling_percent = 0.9
+max_culling_percent = 0.6
 # The minimum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
 min_culling_percent = 0.1
 # The amount at which to adjust the culling percentage
@@ -62,7 +62,7 @@ mating_method = "k_point_crossover"
 # The k in k-point crossover:
 # The number of points at which the given parents' chromosomes are split and then
 # interleaved to form the children's chromosomes
-k = 2
+k = 3
 
 # The number of CPUs to use to run the algorithm
 # num_cpus = 4
