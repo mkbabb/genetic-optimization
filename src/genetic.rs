@@ -442,7 +442,7 @@ pub fn run(
             log::warn!(
                 "Resetting {}% of the population ({} of {}) due to stagnation; reset counter: {}",
                 (culling_percent * 100.0).round(),
-                num_to_cull,
+                num_to_cull - ga_config.num_elites,
                 population.len(),
                 reset_counter,
             );
