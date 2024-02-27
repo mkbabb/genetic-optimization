@@ -109,6 +109,50 @@ fn calculate_fitness(x: &Array2<f64>, costs: &Array1<f64>, discounts: &Array1<f6
     discount_cost_sum
 }
 
+fn calculate_fitness_balanced_buckets(
+    x: &Array2<f64>,
+    costs: &Array1<f64>,
+    discounts: &Array1<f64>,
+    max_bucket_size: f64,
+    balance_weight: f64,
+    size_penalty_weight: f64,
+) -> f64 {
+    let xt = x.t();
+    let total_costs_per_bucket = xt.dot(costs);
+    let total_discounts_per_bucket = xt.dot(discounts);
+    let items_per_bucket: Array1<f64> = xt.sum_axis(Axis(1));
+
+    // Calculate average discounts per bucket, avoiding division by zero by setting empty buckets to 1
+    let avg_discounts_per_bucket = (total_discounts_per_bucket
+        / &items_per_bucket.mapv(|x| if x == 0.0 { 1.0 } else { x }))
+        .mapv(|x| round(x, 2, 3));
+    let discount_costs_per_bucket = total_costs_per_bucket * avg_discounts_per_bucket;
+    let discount_cost_sum = discount_costs_per_bucket.sum();
+
+    // Calculate penalty for buckets that exceed the maximum size
+    let size_penalty: f64 = items_per_bucket
+        .iter()
+        .map(|&size| {
+            if size > max_bucket_size {
+                (size - max_bucket_size).powf(2.0)
+            } else {
+                0.0
+            }
+        })
+        .sum::<f64>()
+        * size_penalty_weight;
+
+    // Calculate penalty for imbalance among bucket sizes to optimize for a balanced spread
+    let mean_size = items_per_bucket.mean().unwrap_or(0.0);
+    let balance_penalty: f64 = items_per_bucket
+        .mapv(|size| (size - mean_size).powf(2.0))
+        .sum()
+        * balance_weight;
+
+    // Subtract penalties from the original fitness score to penalize undesirable configurations
+    discount_cost_sum - size_penalty - balance_penalty
+}
+
 fn write_solution_to_csv(file_path: &Path, solution: &Array2<f64>, _: f64, df: &DataFrame) {
     // Calculate bucket assignments from the solution
     let bucket_assignments = solution.map_axis(Axis(1), |row| {
@@ -182,8 +226,23 @@ fn main() {
         config.genetic_algorithm.pop_size,
     ));
 
-    let fitness_func: FitnessFunction =
-        Arc::new(move |solution, _| calculate_fitness(solution, &costs, &discounts));
+    let fitness_func: FitnessFunction = Arc::new(move |solution, _| {
+        let max_bucket_size = config
+            .genetic_algorithm
+            .max_bucket_size
+            .unwrap_or(usize::MAX) as f64;
+        let balance_weight = config.genetic_algorithm.balance_weight.unwrap_or(1.0);
+        let size_penalty_weight = config.genetic_algorithm.size_penalty_weight.unwrap_or(2.0);
+
+        calculate_fitness_balanced_buckets(
+            solution,
+            &costs,
+            &discounts,
+            max_bucket_size,
+            balance_weight,
+            size_penalty_weight,
+        )
+    });
 
     let writer_func: WriterFunction = Arc::new(move |solution, fitness, config| {
         write_solution_to_csv(&output_file_path, solution, fitness, &df);

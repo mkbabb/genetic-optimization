@@ -1,5 +1,8 @@
 [google]
-sheet_id = "https://docs.google.com/spreadsheets/d/1DdZmbo3tvtrb8fNfgTdgmOpjX-XoKhTcQa1hQLlffPE/edit#gid=1798594710"
+# Production sheet
+# sheet_id = "https://docs.google.com/spreadsheets/d/1DdZmbo3tvtrb8fNfgTdgmOpjX-XoKhTcQa1hQLlffPE/edit#gid=1798594710"
+# Testing sheet
+sheet_id = "https://docs.google.com/spreadsheets/d/1Dir7_JMMbqHvdvhPVL8aEjW1SVrbighf7VA-uQgGdiM/edit#gid=769220148"
 input_range_name = "Output"
 output_range_name = "Output"
 
@@ -42,7 +45,7 @@ num_elites = 10
 culling_method = "random"
 
 # The maximum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
-max_culling_percent = 0.95
+max_culling_percent = 0.5
 # The minimum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
 min_culling_percent = 0.1
 # The amount at which to adjust the culling percentage
@@ -67,3 +70,9 @@ k = 10
 
 # The number of CPUs to use to run the algorithm
 # num_cpus = 4
+
+max_bucket_size = 20
+
+balance_weight = 1.0
+
+size_penalty_weight = 3.0
