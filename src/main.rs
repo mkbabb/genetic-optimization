@@ -11,6 +11,7 @@ use polars::io::{SerReader, SerWriter};
 use polars::prelude::*;
 use polars::series::Series;
 use std::cmp;
+use std::collections::HashSet;
 use std::fs;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -77,73 +78,83 @@ fn calculate_fitness(x: &Array2<f64>, costs: &Array1<f64>, discounts: &Array1<f6
     let xt = x.t();
 
     let total_costs_per_bucket = xt.dot(costs);
-    // log::debug!("total_costs_per_bucket: {:?}", total_costs_per_bucket);
 
     let total_discounts_per_bucket = xt.dot(discounts);
-    // log::debug!(
-    //     "total_discounts_per_bucket: {:?}",
-    //     total_discounts_per_bucket
-    // );
 
     let items_per_bucket: Array1<f64> = xt
         .sum_axis(Axis(1))
         .mapv(|x| if x == 0.0 { 1.0 } else { x });
-    // log::debug!("items_per_bucket: {:?}", items_per_bucket);
 
     let avg_discounts_per_bucket =
         (total_discounts_per_bucket / items_per_bucket).mapv(|x| round(x, 2, 3));
-    // log::debug!("avg_discounts_per_bucket: {:?}", avg_discounts_per_bucket);
 
     let discount_costs_per_bucket = total_costs_per_bucket * avg_discounts_per_bucket;
-    // log::debug!("discount_costs_per_bucket: {:?}", discount_costs_per_bucket);
 
     let discount_cost_sum = discount_costs_per_bucket.sum();
-    // log::debug!("discount_cost_sum: {:?}", discount_cost_sum);
+
     discount_cost_sum
 }
 
-fn calculate_fitness_balanced_buckets(
+fn calculate_fitness_frn_diversity(
     x: &Array2<f64>,
+    bws: &Array1<f64>,
     costs: &Array1<f64>,
     discounts: &Array1<f64>,
-    max_bucket_size: f64,
-    balance_weight: f64,
-    size_penalty_weight: f64,
 ) -> f64 {
-    let xt = x.t();
-    let total_costs_per_bucket = xt.dot(costs);
-    let total_discounts_per_bucket = xt.dot(discounts);
-    let items_per_bucket: Array1<f64> = xt.sum_axis(Axis(1));
+    let calculate_frn_diversity_weights = || -> Array1<f64> {
+        let bucket_assignments: Vec<usize> = x
+            .map_axis(Axis(1), |row| {
+                row.iter()
+                    .enumerate()
+                    .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                    .map(|(index, _)| index)
+                    .unwrap()
+            })
+            .to_vec();
 
-    // Calculate average discounts per bucket, avoiding division by zero by setting empty buckets to 1
-    let avg_discounts_per_bucket = (total_discounts_per_bucket
-        / &items_per_bucket.mapv(|x| if x == 0.0 { 1.0 } else { x }))
-        .mapv(|x| round(x, 2, 3));
-    let discount_costs_per_bucket = total_costs_per_bucket * avg_discounts_per_bucket;
-    let discount_cost_sum = discount_costs_per_bucket.sum();
+        let mut bucket_frn_counts = vec![HashSet::new(); x.ncols()];
 
-    // Calculate penalty for buckets that exceed the maximum size
-    let size_penalty: f64 = items_per_bucket
-        .iter()
-        .map(|&size| {
-            if size > max_bucket_size {
-                (size - max_bucket_size).powf(2.0)
-            } else {
-                0.0
-            }
-        })
-        .sum::<f64>()
-        * size_penalty_weight;
+        for (index, &bucket) in bucket_assignments.iter().enumerate() {
+            let frn = format!("{}-{}", bws[index], costs[index]);
+            bucket_frn_counts[bucket].insert(frn);
+        }
 
-    // Calculate penalty for imbalance among bucket sizes to optimize for a balanced spread
-    let mean_size = items_per_bucket.mean().unwrap_or(0.0);
-    let balance_penalty: f64 = items_per_bucket
-        .mapv(|size| (size - mean_size).powf(2.0))
-        .sum()
-        * balance_weight;
+        let diversity_scores = bucket_frn_counts
+            .iter()
+            .map(|set| set.len() as f64)
+            .collect::<Vec<_>>();
+        let max_diversity = diversity_scores
+            .iter()
+            .max_by(|a, b| a.partial_cmp(b).unwrap())
+            .unwrap_or(&1.0);
 
-    // Subtract penalties from the original fitness score to penalize undesirable configurations
-    discount_cost_sum - size_penalty - balance_penalty
+        // Normalize diversity scores to a range that subtly adjusts the discount costs
+        diversity_scores
+            .iter()
+            .map(|&score| 1.0 - (score / max_diversity))
+            .collect::<Array1<f64>>() + 1.0
+    };
+
+    let frn_diversity_weights = calculate_frn_diversity_weights();
+
+    let calculate_discount_costs = || -> Array1<f64> {
+        let xt = x.t();
+
+        let total_costs_per_bucket = xt.dot(costs);
+
+        let total_discounts_per_bucket = xt.dot(discounts);
+
+        let items_per_bucket: Array1<f64> =
+            xt.sum_axis(Axis(1))
+                .mapv(|x| if x == 0.0 { 1.0 } else { x });
+
+        let avg_discounts_per_bucket =
+            total_discounts_per_bucket / (items_per_bucket * frn_diversity_weights);
+
+        total_costs_per_bucket * avg_discounts_per_bucket.mapv(|x| round(x, 2, 3))
+    };
+
+    calculate_discount_costs().sum()
 }
 
 fn write_solution_to_csv(file_path: &Path, solution: &Array2<f64>, _: f64, df: &DataFrame) {
@@ -197,6 +208,16 @@ fn main() {
         .collect::<Vec<f64>>();
     let costs = Array1::from_vec(costs_array);
 
+    let bws_array = df
+        .column("bw")
+        .expect("BW column not found")
+        .i64()
+        .expect("BW values must be i64")
+        .into_no_null_iter()
+        .map(|x| x as f64)
+        .collect::<Vec<f64>>();
+    let bws = Array1::from_vec(bws_array);
+
     let discounts_array = df
         .column("discount")
         .expect("Discount column not found")
@@ -219,16 +240,16 @@ fn main() {
         config.genetic_algorithm.pop_size,
     ));
 
-    let fitness_func: FitnessFunction = Arc::new(move |solution, _| {
-        let max_bucket_size = config
-            .genetic_algorithm
-            .max_bucket_size
-            .unwrap_or(usize::MAX) as f64;
-        let balance_weight = config.genetic_algorithm.balance_weight.unwrap_or(1.0);
-        let size_penalty_weight = config.genetic_algorithm.size_penalty_weight.unwrap_or(2.0);
+    let fitness_func: FitnessFunction = Arc::new(move |x, _| {
+        // let max_bucket_size = config
+        //     .genetic_algorithm
+        //     .max_bucket_size
+        //     .unwrap_or(usize::MAX) as f64;
+        // let balance_weight = config.genetic_algorithm.balance_weight.unwrap_or(1.0);
+        // let size_penalty_weight = config.genetic_algorithm.size_penalty_weight.unwrap_or(2.0);
 
         // calculate_fitness_balanced_buckets(
-        //     solution,
+        //     x,
         //     &costs,
         //     &discounts,
         //     max_bucket_size,
@@ -236,11 +257,13 @@ fn main() {
         //     size_penalty_weight,
         // )
 
-        calculate_fitness(solution, &costs, &discounts)
+        calculate_fitness_frn_diversity(x, &bws, &costs, &discounts)
+
+        // calculate_fitness(x, &costs, &discounts)
     });
 
-    let writer_func: WriterFunction = Arc::new(move |solution, fitness, config| {
-        write_solution_to_csv(&output_file_path, solution, fitness, &df);
+    let writer_func: WriterFunction = Arc::new(move |x, fitness, config| {
+        write_solution_to_csv(&output_file_path, x, fitness, &df);
         upload_csv_to_sheet(&output_file_path, config);
     });
 
