@@ -108,6 +108,12 @@ pub struct GeneticAlgorithmConfig {
     pub culling_method: CullingMethod,
 
     pub num_cpus: Option<usize>,
+
+    pub max_bucket_size: Option<usize>,
+    
+    pub balance_weight: Option<f64>,
+
+    pub size_penalty_weight: Option<f64>,
 }
 
 pub type Chromosome = Array2<f64>;
