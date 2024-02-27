@@ -8,12 +8,12 @@ output_range_name = "Output"
 generations = 1_000_000_000_000
 
 # The number of no improvments generations before culling the population
-max_no_improvement_generations = 1000
+max_no_improvement_generations = 100
 
 # The number of solutions to try in each generation
 # The higher the number, the more likely the algorithm will find the best solution,
 # but the longer it will take to run
-pop_size = 5000
+pop_size = 200
 
 # The probability of a gene being mutated by the mutation scheme chosen
 # Most numbers between 0.01 and 0.1 are reasonable; else, the muation rate is too high or too low
@@ -39,10 +39,10 @@ num_elites = 10
 
 # The function used to cull the population
 # This can be: "best_mutants", "best_mutants_random", "random"
-culling_method = "best_mutants_random"
+culling_method = "random"
 
 # The maximum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
-max_culling_percent = 0.9
+max_culling_percent = 0.95
 # The minimum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
 min_culling_percent = 0.1
 # The amount at which to adjust the culling percentage
@@ -53,7 +53,7 @@ culling_direction = "forward"
 
 # The function used to select the parents for mating
 # This can be: "rank", "tournament", "roulette"
-selection_method = "tournament"
+selection_method = "rank"
 # The tournament size for the tournament selection method
 tournament_size = 10
 
@@ -63,7 +63,7 @@ mating_method = "k_point_crossover"
 # The k in k-point crossover:
 # The number of points at which the given parents' chromosomes are split and then
 # interleaved to form the children's chromosomes
-k = 13
+k = 10
 
 # The number of CPUs to use to run the algorithm
 # num_cpus = 4
