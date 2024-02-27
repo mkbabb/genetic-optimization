@@ -234,14 +234,16 @@ fn main() {
         let balance_weight = config.genetic_algorithm.balance_weight.unwrap_or(1.0);
         let size_penalty_weight = config.genetic_algorithm.size_penalty_weight.unwrap_or(2.0);
 
-        calculate_fitness_balanced_buckets(
-            solution,
-            &costs,
-            &discounts,
-            max_bucket_size,
-            balance_weight,
-            size_penalty_weight,
-        )
+        // calculate_fitness_balanced_buckets(
+        //     solution,
+        //     &costs,
+        //     &discounts,
+        //     max_bucket_size,
+        //     balance_weight,
+        //     size_penalty_weight,
+        // )
+
+        calculate_fitness(solution, &costs, &discounts)
     });
 
     let writer_func: WriterFunction = Arc::new(move |solution, fitness, config| {

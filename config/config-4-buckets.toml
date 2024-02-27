@@ -1,8 +1,8 @@
 [google]
 # Production sheet
-# sheet_id = "https://docs.google.com/spreadsheets/d/1DdZmbo3tvtrb8fNfgTdgmOpjX-XoKhTcQa1hQLlffPE/edit#gid=1798594710"
+sheet_id = "https://docs.google.com/spreadsheets/d/1DdZmbo3tvtrb8fNfgTdgmOpjX-XoKhTcQa1hQLlffPE/edit#gid=1798594710"
 # Testing sheet
-sheet_id = "https://docs.google.com/spreadsheets/d/1Dir7_JMMbqHvdvhPVL8aEjW1SVrbighf7VA-uQgGdiM/edit#gid=769220148"
+# sheet_id = "https://docs.google.com/spreadsheets/d/1Dir7_JMMbqHvdvhPVL8aEjW1SVrbighf7VA-uQgGdiM/edit#gid=769220148"
 input_range_name = "Output"
 output_range_name = "Output"
 
@@ -21,7 +21,7 @@ pop_size = 200
 # The probability of a gene being mutated by the mutation scheme chosen
 # Most numbers between 0.01 and 0.1 are reasonable; else, the muation rate is too high or too low
 # and the algorithm will not converge to a good solution
-mutation_rate = 0.01
+mutation_rate = 0.005
 
 # The mean and standard deviation of the Gaussian distribution used to mutate the genes
 mutation_mean = 0
@@ -32,7 +32,7 @@ mutation_lower_bound = 0
 mutation_upper_bound = 1
 # The function used to mutate the children's chromosomes
 # This can be: "standard", "gaussian", "bit_flip", "uniform"
-mutation_method = "gaussian"
+mutation_method = "standard"
 
 # The number of solutions to interleave and mate to form a child
 num_parents = 2
@@ -42,10 +42,10 @@ num_elites = 10
 
 # The function used to cull the population
 # This can be: "best_mutants", "best_mutants_random", "random"
-culling_method = "random"
+culling_method = "best_mutants"
 
 # The maximum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
-max_culling_percent = 0.5
+max_culling_percent = 0.2
 # The minimum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
 min_culling_percent = 0.1
 # The amount at which to adjust the culling percentage
@@ -56,7 +56,7 @@ culling_direction = "forward"
 
 # The function used to select the parents for mating
 # This can be: "rank", "tournament", "roulette"
-selection_method = "rank"
+selection_method = "tournament"
 # The tournament size for the tournament selection method
 tournament_size = 10
 
@@ -66,7 +66,7 @@ mating_method = "k_point_crossover"
 # The k in k-point crossover:
 # The number of points at which the given parents' chromosomes are split and then
 # interleaved to form the children's chromosomes
-k = 10
+k = 3
 
 # The number of CPUs to use to run the algorithm
 # num_cpus = 4
