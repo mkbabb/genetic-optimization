@@ -132,7 +132,8 @@ fn calculate_fitness_frn_diversity(
         diversity_scores
             .iter()
             .map(|&score| 1.0 - (score / max_diversity))
-            .collect::<Array1<f64>>() + 1.0
+            .collect::<Array1<f64>>()
+            + 1.0
     };
 
     let frn_diversity_weights = calculate_frn_diversity_weights();
@@ -157,9 +158,9 @@ fn calculate_fitness_frn_diversity(
     calculate_discount_costs().sum()
 }
 
-fn write_solution_to_csv(file_path: &Path, solution: &Array2<f64>, _: f64, df: &DataFrame) {
-    // Calculate bucket assignments from the solution
-    let bucket_assignments = solution.map_axis(Axis(1), |row| {
+fn write_solution_to_csv(file_path: &Path, x: &Array2<f64>, fitness: f64, df: &DataFrame) {
+    // Calculate bucket assignments from the x
+    let bucket_assignments = x.map_axis(Axis(1), |row| {
         row.iter()
             .enumerate()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
