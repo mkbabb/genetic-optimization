@@ -1,16 +1,9 @@
 pub mod genetic;
 pub mod utils;
 
-use crate::genetic::{
-    gaussian_mutation, init_ga_funcs, k_point_crossover, rank_selection, roulette_wheel_selection,
-    run, standard_mutation, tournament_selection, uniform_crossover,
-};
-use crate::utils::{
-    init_logger, round, Config, CullingMethod, MatingMethod, MutationMethod, SelectionMethod,
-};
-
+use crate::genetic::{init_ga_funcs, run};
+use crate::utils::{init_logger, round, Config};
 use clap::{arg, command, Parser};
-use genetic_optimization::genetic::cull_best_mutants;
 use ndarray::{Array1, Array2, Axis};
 use polars::frame::DataFrame;
 use polars::io::csv::{CsvReader, CsvWriter};
@@ -25,7 +18,7 @@ use std::sync::Arc;
 use tempfile::NamedTempFile;
 use utils::{
     download_sheet_to_csv, upload_csv_to_sheet, FitnessFunction, GeneticAlgorithmConfig,
-    MatingFunction, MutationFunction, SelectionMethodFunction, WriterFunction,
+    MutationFunction, WriterFunction,
 };
 
 /// Simple program to greet a person
