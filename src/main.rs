@@ -133,6 +133,7 @@ fn calculate_fitness_frn_diversity(
             .iter()
             .map(|&score| 1.0 - (score / max_diversity))
             .collect::<Array1<f64>>()
+            * 0.5
             + 1.0
     };
 
