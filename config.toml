@@ -1,6 +1,6 @@
 [google]
 sheet_id = "https://docs.google.com/spreadsheets/d/1K6gLATrgUSZFXgec5u5qP--4tH74QKSmjnoVjq5VqFk/edit?gid=769220148#gid=769220148"
-input_range_name = "Input"
+input_range_name = "Output"
 output_range_name = "Output"
 
 [genetic_algorithm]
@@ -8,12 +8,12 @@ output_range_name = "Output"
 generations = 1_000_000_000_000
 
 # The number of no improvments generations before culling the population
-max_no_improvement_generations = 2000
+max_no_improvement_generations = 10000
 
 # The number of solutions to try in each generation
 # The higher the number, the more likely the algorithm will find the best solution,
 # but the longer it will take to run
-pop_size = 500
+pop_size = 10000
 
 # The probability of a gene being mutated by the mutation scheme chosen
 # Most numbers between 0.01 and 0.1 are reasonable; else, the muation rate is too high or too low
@@ -35,7 +35,7 @@ mutation_method = "standard"
 num_parents = 2
 
 # Elitism: the number of best solutions to keep from the previous generation
-num_elites = 10
+num_elites = 25
 
 # The function used to cull the population
 culling_method = "best_mutants"
@@ -43,7 +43,7 @@ culling_method = "best_mutants"
 # The maximum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
 max_culling_percent = 0.1
 # The minimum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
-min_culling_percent = 0.1
+min_culling_percent = 0.05
 # The amount at which to adjust the culling percentage
 culling_percent_increment = 1.01
 # Either increase or decrease the culling percentage

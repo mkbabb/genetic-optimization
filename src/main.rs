@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::NamedTempFile;
 use utils::{
-    FitnessFunction, GeneticAlgorithmConfig, MutationFunction, MutationMethod, WriterFunction,
+    FitnessFunction, GeneticAlgorithmConfig, MutationFunction, WriterFunction,
     download_sheet_to_csv, upload_csv_to_sheet,
 };
 
@@ -37,9 +37,21 @@ pub fn initialize_population_from_solution(
     pop_size: usize,
 ) -> Vec<Array2<f64>> {
     // Determine the maximum bucket value from the DataFrame
-    let bucket_series = df.column("bucket").unwrap().i64().unwrap();
 
-    let max_bucket_value = bucket_series.into_iter().flatten().max().unwrap_or(0) as usize;
+    // If a bucket row is null, pick a random bucket between 1 and the number of buckets
+    let bucket_series = df
+        .column("bucket")
+        .expect("Bucket column not found")
+        .iter()
+        .map(|opt| match opt {
+            AnyValue::Int64(x) => x as usize,
+            AnyValue::Float64(x) => x as usize,
+            AnyValue::Null => rand::random::<usize>() % buckets + 1, // Random bucket between 1 and buckets
+            _ => panic!("Invalid bucket value"),
+        })
+        .collect::<Vec<usize>>();
+
+    let max_bucket_value = *bucket_series.iter().max().unwrap_or(&0);
 
     // Adjust the bucket count to be the upper bound of the largest bucket
     let buckets = cmp::max(buckets, max_bucket_value);
@@ -49,8 +61,9 @@ pub fn initialize_population_from_solution(
         .map(|_| {
             let mut x = Array2::<f64>::zeros((df.height(), buckets));
 
-            for (i, bucket) in bucket_series.into_no_null_iter().enumerate() {
-                let bucket = (bucket - 1) as usize; // assuming 1-indexed buckets
+            for (i, bucket) in bucket_series.iter().enumerate() {
+                let bucket = bucket - 1; // assuming 1-indexed buckets
+
                 x[(i, bucket)] = 1.0;
             }
             x
@@ -231,38 +244,38 @@ fn main() {
         .collect::<Vec<f64>>();
     let discounts = Array1::from_vec(discounts_array);
 
-    // let buckets = df
-    //     .column("bucket")
-    //     .expect("Bucket column not found")
-    //     .n_unique()
-    //     .unwrap();
+    let buckets = df
+        .column("bucket")
+        .expect("Bucket column not found")
+        .n_unique()
+        .unwrap();
 
-    // let population = Arc::new(initialize_population_from_solution(
-    //     &df,
-    //     buckets,
-    //     config.genetic_algorithm.pop_size,
-    // ));
-
-    let buckets = 4;
-
-    let mutation_func: MutationFunction = Arc::new(|x, config| match config.mutation_method {
-        MutationMethod::Gaussian => gaussian_mutation(
-            x,
-            config.mutation_rate,
-            config.mutation_mean,
-            config.mutation_std_dev,
-        ),
-        MutationMethod::Standard => standard_mutation(x, config.mutation_rate),
-        _ => unimplemented!(),
-    });
-
-    let population = Arc::new(initialize_population_random(
+    let population = Arc::new(initialize_population_from_solution(
         &df,
         buckets,
         config.genetic_algorithm.pop_size,
-        mutation_func,
-        &config.genetic_algorithm,
     ));
+
+    // let buckets = 4;
+
+    // let mutation_func: MutationFunction = Arc::new(|x, config| match config.mutation_method {
+    //     MutationMethod::Gaussian => gaussian_mutation(
+    //         x,
+    //         config.mutation_rate,
+    //         config.mutation_mean,
+    //         config.mutation_std_dev,
+    //     ),
+    //     MutationMethod::Standard => standard_mutation(x, config.mutation_rate),
+    //     _ => unimplemented!(),
+    // });
+
+    // let population = Arc::new(initialize_population_random(
+    //     &df,
+    //     buckets,
+    //     config.genetic_algorithm.pop_size,
+    //     mutation_func,
+    //     &config.genetic_algorithm,
+    // ));
 
     let fitness_func: FitnessFunction = Arc::new(move |x, _| {
         // let max_bucket_size = config
