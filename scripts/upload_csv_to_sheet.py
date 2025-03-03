@@ -12,8 +12,8 @@ def upload_csv_to_sheet(file_path: pathlib.Path, file_id: str, range_name: str) 
 
     try:
         df = pd.read_csv(file_path)
-        sheets.batch_update(
-            spreadsheet_id=file_id, data={range_name: sheets.from_frame(df)}
+        sheets.update(
+            spreadsheet_id=file_id, range_name=range_name, values=sheets.from_frame(df)
         )
         # logger.info(f"Uploaded {file_path} to sheet ID: {file_id}, range: {range_name}")
     except Exception as e:

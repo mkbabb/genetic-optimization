@@ -2,8 +2,9 @@ pub mod genetic;
 pub mod utils;
 
 use crate::genetic::{init_ga_funcs, run};
-use crate::utils::{init_logger, round, Config};
-use clap::{arg, command, Parser};
+use crate::utils::{Config, init_logger, round};
+use clap::{Parser, arg, command};
+use genetic::{gaussian_mutation, standard_mutation};
 use ndarray::{Array1, Array2, Axis};
 use polars::frame::DataFrame;
 use polars::io::csv::{CsvReader, CsvWriter};
@@ -18,8 +19,8 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::NamedTempFile;
 use utils::{
-    download_sheet_to_csv, upload_csv_to_sheet, FitnessFunction, GeneticAlgorithmConfig,
-    MutationFunction, WriterFunction,
+    FitnessFunction, GeneticAlgorithmConfig, MutationFunction, MutationMethod, WriterFunction,
+    download_sheet_to_csv, upload_csv_to_sheet,
 };
 
 /// Simple program to greet a person
@@ -61,14 +62,14 @@ fn initialize_population_random(
     df: &DataFrame,
     buckets: usize,
     pop_size: usize,
-    mutation_fn: MutationFunction,
+    mutation_func: MutationFunction,
     config: &GeneticAlgorithmConfig,
 ) -> Vec<Array2<f64>> {
     (0..pop_size)
         .map(|_| {
             let mut x = Array2::<f64>::zeros((df.height(), buckets));
             x.column_mut(0).fill(1.0);
-            mutation_fn(&mut x, config);
+            mutation_func(&mut x, config);
             x
         })
         .collect()
@@ -146,9 +147,9 @@ fn calculate_fitness_frn_diversity(
 
         let total_discounts_per_bucket = xt.dot(discounts);
 
-        let items_per_bucket: Array1<f64> =
-            xt.sum_axis(Axis(1))
-                .mapv(|x| if x == 0.0 { 1.0 } else { x });
+        let items_per_bucket: Array1<f64> = xt
+            .sum_axis(Axis(1))
+            .mapv(|x| if x == 0.0 { 1.0 } else { x });
 
         let avg_discounts_per_bucket =
             total_discounts_per_bucket / (items_per_bucket * frn_diversity_weights);
@@ -230,16 +231,37 @@ fn main() {
         .collect::<Vec<f64>>();
     let discounts = Array1::from_vec(discounts_array);
 
-    let buckets = df
-        .column("bucket")
-        .expect("Bucket column not found")
-        .n_unique()
-        .unwrap();
+    // let buckets = df
+    //     .column("bucket")
+    //     .expect("Bucket column not found")
+    //     .n_unique()
+    //     .unwrap();
 
-    let population = Arc::new(initialize_population_from_solution(
+    // let population = Arc::new(initialize_population_from_solution(
+    //     &df,
+    //     buckets,
+    //     config.genetic_algorithm.pop_size,
+    // ));
+
+    let buckets = 4;
+
+    let mutation_func: MutationFunction = Arc::new(|x, config| match config.mutation_method {
+        MutationMethod::Gaussian => gaussian_mutation(
+            x,
+            config.mutation_rate,
+            config.mutation_mean,
+            config.mutation_std_dev,
+        ),
+        MutationMethod::Standard => standard_mutation(x, config.mutation_rate),
+        _ => unimplemented!(),
+    });
+
+    let population = Arc::new(initialize_population_random(
         &df,
         buckets,
         config.genetic_algorithm.pop_size,
+        mutation_func,
+        &config.genetic_algorithm,
     ));
 
     let fitness_func: FitnessFunction = Arc::new(move |x, _| {
@@ -259,9 +281,9 @@ fn main() {
         //     size_penalty_weight,
         // )
 
-        calculate_fitness_frn_diversity(x, &bws, &costs, &discounts)
+        // calculate_fitness_frn_diversity(x, &bws, &costs, &discounts)
 
-        // calculate_fitness(x, &costs, &discounts)
+        calculate_fitness(x, &costs, &discounts)
     });
 
     let writer_func: WriterFunction = Arc::new(move |x, fitness, config| {

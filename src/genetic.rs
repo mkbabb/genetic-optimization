@@ -1,11 +1,11 @@
 use crate::utils::*;
 
-use ndarray::{s, Array2, Axis};
+use ndarray::{Array2, Axis, s};
 use ndarray_rand::rand_distr::Normal;
 use rand::{
+    Rng,
     distributions::Distribution,
     seq::{IteratorRandom, SliceRandom},
-    Rng,
 };
 use rayon::prelude::*;
 use std::sync::Arc;
@@ -77,7 +77,7 @@ pub fn standard_mutation(x: &mut Chromosome, mutation_rate: f64) {
     let n_cols = x.ncols();
 
     x.axis_iter_mut(Axis(0)).for_each(|mut row| {
-        if rng.gen::<f64>() >= mutation_rate {
+        if rng.r#gen::<f64>() >= mutation_rate {
             return;
         }
 
@@ -93,7 +93,7 @@ pub fn gaussian_mutation(x: &mut Chromosome, mutation_rate: f64, mean: f64, std_
     let mut rng = rand::thread_rng();
 
     x.axis_iter_mut(Axis(0)).for_each(|mut row| {
-        if rng.gen::<f64>() >= mutation_rate {
+        if rng.r#gen::<f64>() >= mutation_rate {
             return;
         }
 
@@ -139,7 +139,7 @@ pub fn roulette_wheel_selection(population: &[Chromosome], fitnesses: &[f64]) ->
             acc + prob
         });
 
-    let choice = rng.gen::<f64>();
+    let choice = rng.r#gen::<f64>();
     let selected_index = cumulative_probabilities
         .iter()
         .position(|&p| p >= choice)
@@ -172,7 +172,7 @@ pub fn rank_selection(population: &[Chromosome], fitnesses: &[f64]) -> Chromosom
     });
 
     // Draw a random number and find the corresponding individual
-    let choice = rng.gen::<f64>();
+    let choice = rng.r#gen::<f64>();
     let mut selected_index = 0;
     for (i, &cumulative_prob) in cumulative_probabilities.iter().enumerate() {
         if choice <= cumulative_prob {
@@ -396,7 +396,7 @@ pub fn run(
             .collect::<Vec<_>>()
     };
 
-    for gen in 0..ga_config.generations {
+    for g in 0..ga_config.generations {
         let fitnesses = Arc::new(
             population
                 .par_iter()
@@ -410,7 +410,7 @@ pub fn run(
         let best_ix = fitness_ixs[0].0;
         let t_best_fitness = fitnesses[best_ix];
 
-        log::debug!("Generation {} best fitness: {:.4}", gen, t_best_fitness);
+        log::debug!("Generation {} best fitness: {:.4}", g, t_best_fitness);
 
         if t_best_fitness > best_fitness {
             best_solution = population[best_ix].clone();
@@ -423,7 +423,7 @@ pub fn run(
             reset_counter = 0;
 
             writer_func(&best_solution, best_fitness, config)
-        } else if gen > 0 {
+        } else if g > 0 {
             no_improvement_counter += 1;
         }
 
