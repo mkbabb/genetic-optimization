@@ -9,17 +9,16 @@ import re
 import subprocess
 import sys
 import tempfile
-import tomllib  # type: ignore
 from typing import *
 
 import ipinfo  # type: ignore
 import numpy as np
 import openai
 import pandas as pd
+import tomllib  # type: ignore
+from googleapiutils2 import Drive, GoogleMimeTypes, Sheets, SheetSlice, get_oauth2_creds
 from loguru import logger
 from openai.types.chat import ChatCompletion
-
-from googleapiutils2 import Drive, GoogleMimeTypes, Sheets, SheetSlice, get_oauth2_creds
 
 FitnessFunction = Callable[[np.ndarray, np.ndarray, np.ndarray], float]
 SelectionMethodFunction = Callable[[list[np.ndarray], list[float]], np.ndarray]

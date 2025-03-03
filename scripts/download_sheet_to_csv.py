@@ -1,8 +1,5 @@
-# download_sheet_to_csv.py
-import argparse
 import pathlib
 
-import pandas as pd
 from googleapiutils2 import Sheets
 from loguru import logger
 
@@ -27,6 +24,5 @@ def download_sheet_to_csv(
 
 
 if __name__ == "__main__":
-
     args = init_parser().parse_args()
     download_sheet_to_csv(args.file_path, args.file_id, args.range_name)
