@@ -1,6 +1,6 @@
 [google]
 sheet_id = "https://docs.google.com/spreadsheets/d/1K6gLATrgUSZFXgec5u5qP--4tH74QKSmjnoVjq5VqFk/edit?gid=769220148#gid=769220148"
-input_range_name = "Output"
+input_range_name = "Copy of Output"
 output_range_name = "Output"
 
 [genetic_algorithm]
