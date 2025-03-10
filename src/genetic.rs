@@ -87,9 +87,9 @@ pub fn standard_mutation(x: &mut Chromosome, mutation_rate: f64) {
     });
 }
 
-pub fn gaussian_mutation(x: &mut Chromosome, mutation_rate: f64, mean: f64, std_dev: f64) {
+pub fn gaussian_mutation(x: &mut Chromosome, mutation_rate: f64, mean: f64, std: f64) {
     let n_cols = x.ncols();
-    let normal_dist = Normal::new(mean, std_dev).unwrap();
+    let normal_dist = Normal::new(mean, std).unwrap();
     let mut rng = rand::thread_rng();
 
     x.axis_iter_mut(Axis(0)).for_each(|mut row| {
@@ -297,7 +297,7 @@ pub fn init_ga_funcs(
             x,
             config.mutation_rate,
             config.mutation_mean,
-            config.mutation_std_dev,
+            config.mutation_std,
         ),
         MutationMethod::Standard => standard_mutation(x, config.mutation_rate),
         _ => unimplemented!(),
@@ -359,9 +359,10 @@ pub fn run(
     let mut reset_counter = 0_usize;
 
     let was_no_improvement = |no_improvement_counter: usize, reset_counter: usize| {
-        let backoff = 2_usize.pow((reset_counter.min(MAX_EXPONENT) + 1) as u32);
+        // let backoff = 2_usize.pow((reset_counter.min(MAX_EXPONENT)) as u32);
+        // no_improvement_counter >= ga_config.max_no_improvement_generations * backoff
 
-        backoff.min(ga_config.max_no_improvement_generations) <= no_improvement_counter
+        no_improvement_counter >= ga_config.max_no_improvement_generations
     };
 
     let par_mate = |chunk_ix: usize, population: &[Chromosome], fitnesses: &[f64]| {
@@ -440,7 +441,8 @@ pub fn run(
             let num_to_cull = (population.len() as f64 * culling_percent).ceil() as usize;
 
             log::warn!(
-                "Resetting {}% of the population ({} of {}) due to stagnation; reset counter: {}",
+                "Iteration {}; Resetting {}% of the population ({} of {}) due to stagnation; reset counter: {}",
+                g,
                 (culling_percent * 100.0).round(),
                 num_to_cull - ga_config.num_elites,
                 population.len(),
@@ -450,6 +452,7 @@ pub fn run(
             no_improvement_counter = 0;
             reset_counter += 1;
 
+            // Culling the population
             let culled_population =
                 culling_func(&population, &best_solution, num_to_cull, ga_config)
                     .into_iter()

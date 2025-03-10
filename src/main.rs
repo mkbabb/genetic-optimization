@@ -99,6 +99,7 @@ fn calculate_fitness(x: &Array2<f64>, costs: &Array1<f64>, discounts: &Array1<f6
         .sum_axis(Axis(1))
         .mapv(|x| if x == 0.0 { 1.0 } else { x });
 
+    // !TODO 0.7 low round function
     let avg_discounts_per_bucket =
         (total_discounts_per_bucket / items_per_bucket).mapv(|x| round(x, 2, 3));
 
@@ -117,37 +118,40 @@ fn calculate_fitness_with_cohesion(
 ) -> f64 {
     // Calculate the original fitness
     let discount_cost_sum = calculate_fitness(x, costs, discounts);
-    
+
     // Count distinct FRNs
     let cost_ints: Vec<i64> = costs.iter().map(|&c| c as i64).collect();
 
     let unique_frns: HashSet<i64> = cost_ints.iter().cloned().collect();
     let frn_count = unique_frns.len() as f64;
-    
+
     // For each unique FRN, count in how many buckets it appears
     let mut total_bucket_occurrences = 0.0;
-    
+
     for &frn in unique_frns.iter() {
         // Find rows with this FRN
-        let frn_indices: Vec<usize> = cost_ints.iter()
+        let frn_indices: Vec<usize> = cost_ints
+            .iter()
             .enumerate()
             .filter_map(|(idx, &cost)| if cost == frn { Some(idx) } else { None })
             .collect();
-        
+
         // For each bucket, check if at least one item with this FRN is assigned to it
         let mut bucket_count = 0;
-        
+
         for bucket_idx in 0..x.ncols() {
-            let has_frn_in_bucket = frn_indices.iter().any(|&row_idx| x[(row_idx, bucket_idx)] > 0.0);
-            
+            let has_frn_in_bucket = frn_indices
+                .iter()
+                .any(|&row_idx| x[(row_idx, bucket_idx)] > 0.0);
+
             if has_frn_in_bucket {
                 bucket_count += 1;
             }
         }
-        
+
         total_bucket_occurrences += bucket_count as f64;
     }
-    
+
     // Calculate the cohesion penalty
     let frn_cohesion = total_bucket_occurrences / frn_count;
     let cohesion_penalty = frn_cohesion * frn_cohesion_factor;
@@ -260,13 +264,11 @@ fn main() {
     //     &config.genetic_algorithm,
     // ));
 
-    let frn_cohesion_factor = 1_000_000.0; // Default value
+    let frn_cohesion_factor = 500_000.0; // Default value
 
-    let fitness_func: FitnessFunction =
-        Arc::new(move |x, _| 
-            // calculate_fitness(x, &costs, &discounts)
-            calculate_fitness_with_cohesion(x, &costs, &discounts, frn_cohesion_factor)
-        );
+    let fitness_func: FitnessFunction = Arc::new(
+        move |x, _| calculate_fitness(x, &costs, &discounts), // calculate_fitness_with_cohesion(x, &costs, &discounts, frn_cohesion_factor)
+    );
 
     let writer_func: WriterFunction = Arc::new(move |x, fitness, config| {
         write_solution_to_csv(&output_file_path, x, fitness, &df);

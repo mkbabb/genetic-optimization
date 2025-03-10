@@ -1,6 +1,7 @@
 [google]
-sheet_id = "https://docs.google.com/spreadsheets/d/1K6gLATrgUSZFXgec5u5qP--4tH74QKSmjnoVjq5VqFk/edit?gid=769220148#gid=769220148"
-input_range_name = "Copy of Output"
+# sheet_id = "https://docs.google.com/spreadsheets/d/1K6gLATrgUSZFXgec5u5qP--4tH74QKSmjnoVjq5VqFk/edit?gid=769220148#gid=769220148"
+sheet_id = "https://docs.google.com/spreadsheets/d/10J0_WbhdNVg9bPds3GTZbfoRM-S0XnvX0YrCYAHggVw/edit?gid=283107781#gid=283107781"
+input_range_name = "Output"
 output_range_name = "Output"
 
 [genetic_algorithm]
@@ -8,21 +9,21 @@ output_range_name = "Output"
 generations = 1_000_000_000_000
 
 # The number of no improvments generations before culling the population
-max_no_improvement_generations = 10000
+max_no_improvement_generations = 1_000
 
 # The number of solutions to try in each generation
 # The higher the number, the more likely the algorithm will find the best solution,
 # but the longer it will take to run
-pop_size = 10000
+pop_size = 1_000
 
 # The probability of a gene being mutated by the mutation scheme chosen
 # Most numbers between 0.01 and 0.1 are reasonable; else, the muation rate is too high or too low
 # and the algorithm will not converge to a good solution
-mutation_rate = 0.01
+mutation_rate = 0.015
 
 # The mean and standard deviation of the Gaussian distribution used to mutate the genes
 mutation_mean = 0
-mutation_std_dev = 1.0
+mutation_std = 0.1
 
 # The lower and upper bounds of the genes in the chromosome
 mutation_lower_bound = 0
@@ -41,7 +42,7 @@ num_elites = 25
 culling_method = "best_mutants"
 
 # The maximum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
-max_culling_percent = 0.1
+max_culling_percent = 1.0
 # The minimum percentage of the population to cull if no improvement is made in the last no_improvement_counter generations
 min_culling_percent = 0.05
 # The amount at which to adjust the culling percentage

@@ -83,7 +83,7 @@ pub struct GeneticAlgorithmConfig {
     pub mutation_rate: f64,
 
     pub mutation_mean: f64,
-    pub mutation_std_dev: f64,
+    pub mutation_std: f64,
 
     pub mutation_lower_bound: f64,
     pub mutation_upper_bound: f64,
